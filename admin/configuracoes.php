@@ -46,7 +46,7 @@ admin_header('Configurações', 'config');
 <form method="post" class="card">
   <?= csrf_field() ?><input type="hidden" name="action" value="site">
   <h2>Site</h2>
-  <label>Nome do site <input name="site_name" value="<?= e(setting('site_name', 'Achados')) ?>"></label>
+  <label>Nome do site <input name="site_name" value="<?= e(setting('site_name', 'Achados Meli')) ?>"></label>
   <label>Frase de destaque <input name="site_tagline" value="<?= e(setting('site_tagline', 'Os melhores achados do Mercado Livre, todo dia.')) ?>"></label>
   <label>Link do grupo de WhatsApp (opcional) <input name="whatsapp_group" value="<?= e(setting('whatsapp_group')) ?>" placeholder="https://chat.whatsapp.com/..."></label>
   <label>Canal do Telegram (opcional) <input name="telegram_channel" value="<?= e(setting('telegram_channel')) ?>" placeholder="https://t.me/..."></label>

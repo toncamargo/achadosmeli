@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 function admin_header(string $title, string $active = ''): void
 {
-    $site = setting('site_name', 'Achados');
+    $site = setting('site_name', 'Achados Meli');
     $nav = [
         'produtos' => ['index.php', 'Produtos'],
         'buscar' => ['buscar.php', 'Buscar no ML'],
