@@ -8,6 +8,7 @@ function admin_header(string $title, string $active = ''): void
         'produtos' => ['index.php', 'Produtos'],
         'buscar' => ['buscar.php', 'Buscar no ML'],
         'categorias' => ['categorias.php', 'Categorias'],
+        'banners' => ['banners.php', 'Banners'],
         'config' => ['configuracoes.php', 'Configurações'],
     ];
     ?><!doctype html>
@@ -17,6 +18,9 @@ function admin_header(string $title, string $active = ''): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title><?= e($title) ?> · Admin <?= e($site) ?></title>
+<link rel="icon" href="<?= e(url('assets/favicon.svg')) ?>" type="image/svg+xml">
+<link rel="icon" href="<?= e(url('assets/favicon.png')) ?>" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="<?= e(url('assets/apple-touch-icon.png')) ?>">
 <link rel="stylesheet" href="<?= e(url('assets/style.css')) ?>">
 </head>
 <body class="admin">

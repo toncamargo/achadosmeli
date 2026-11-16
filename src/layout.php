@@ -47,7 +47,9 @@ function site_header(array $meta = []): void
 <meta property="og:type" content="<?= isset($meta['jsonld']) ? 'product' : 'website' ?>">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#ffe102">
-<link rel="icon" href="<?= e(url('assets/favicon.png')) ?>">
+<link rel="icon" href="<?= e(url('assets/favicon.svg')) ?>" type="image/svg+xml">
+<link rel="icon" href="<?= e(url('assets/favicon.png')) ?>" type="image/png" sizes="64x64">
+<link rel="apple-touch-icon" href="<?= e(url('assets/apple-touch-icon.png')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -73,7 +75,7 @@ function site_header(array $meta = []): void
     <?php endif; ?>
   </div>
   <div class="wrap nav-row">
-    <span class="nav-hint">Site independente<br><b>de achados afiliados</b></span>
+    <span class="nav-hint">Site independente<br><b>de achados afiliados Mercado Livre</b></span>
     <nav class="nav-main">
       <?php if ($cats): ?>
       <details class="cat-menu">
@@ -140,7 +142,7 @@ function product_card(array $p, string $extra = ''): void
       <?php if ($p['free_shipping']): ?><span class="ship">Frete grátis</span><?php endif; ?>
       <?php if (!empty($p['coupon'])): ?><span class="cpn">Cupom <?= e($p['coupon']) ?></span><?php endif; ?>
       <h3><a href="<?= e(product_url($p)) ?>"><?= e($p['title']) ?></a></h3>
-      <a class="cta" href="<?= e(go_url($p)) ?>" target="_blank" rel="sponsored nofollow noopener">Ver no Mercado Livre</a>
+      <a class="cta" href="<?= e(go_url($p)) ?>" target="_blank" rel="sponsored nofollow noopener">Comprar</a>
     </div>
   </article>
 <?php

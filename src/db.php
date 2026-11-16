@@ -113,6 +113,24 @@ function db_migrate(): void
         recorded_at $text NOT NULL
     )$engine");
 
+    // Banners do carrossel da home (campanhas: Black Friday, Dia das Mães...)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS banners (
+        id $pk,
+        kicker $text NULL,
+        title $text NULL,
+        prefix $text NULL,
+        highlight $text NULL,
+        pill $text NULL,
+        footnote $text NULL,
+        image TEXT,
+        link_url TEXT,
+        sort_order INT NOT NULL DEFAULT 0,
+        active INT NOT NULL DEFAULT 1,
+        starts_at $text NULL,
+        ends_at $text NULL,
+        created_at $text NOT NULL
+    )$engine");
+
     // Categorias iniciais (só na primeira vez)
     $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
     if ($count === 0) {

@@ -233,6 +233,35 @@ function record_price(int $productId, float $price): void
         ->execute([$productId, $price, now()]);
 }
 
+/** Banners ativos e dentro do período (datas vazias = sem limite). */
+function active_banners(): array
+{
+    $today = date('Y-m-d');
+    $st = db()->prepare("SELECT * FROM banners WHERE active = 1
+        AND (starts_at IS NULL OR starts_at = '' OR starts_at <= ?)
+        AND (ends_at IS NULL OR ends_at = '' OR ends_at >= ?)
+        ORDER BY sort_order, id DESC");
+    $st->execute([$today, $today]);
+    return $st->fetchAll();
+}
+
+/** Salva imagem enviada no admin em assets/uploads. Retorna a URL ou null. */
+function save_upload(array $file): ?string
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return null;
+    if ($file['size'] > 4 * 1024 * 1024) throw new RuntimeException('Imagem maior que 4 MB.');
+    $info = @getimagesize($file['tmp_name']);
+    $ext = match ($info['mime'] ?? '') {
+        'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif',
+        default => throw new RuntimeException('Envie uma imagem JPG, PNG, WEBP ou GIF.'),
+    };
+    $dir = __DIR__ . '/../assets/uploads';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    $name = date('Ymd-His') . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], "$dir/$name")) throw new RuntimeException('Não consegui salvar a imagem (permissão da pasta assets/uploads).');
+    return url('assets/uploads/' . $name);
+}
+
 function categories(): array
 {
     return db()->query('SELECT * FROM categories ORDER BY sort_order, name')->fetchAll();
