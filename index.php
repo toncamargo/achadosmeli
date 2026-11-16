@@ -55,10 +55,7 @@ if ($isHome) {
         $suffix = '';
         if (preg_match('/^(.*?)\s*(OFF|DESCONTO)$/iu', $hl, $m) && $m[1] !== '') { $hl = $m[1]; $suffix = $m[2]; }
         $link = (string)$b['link_url'];
-        // Banner "arte pronta": sem etiqueta, destaque nem botão -> a imagem ocupa o slide inteiro
-        $full = trim((string)$b['kicker']) === '' && $hl === '' && trim((string)$b['pill']) === '';
         $slides[] = [
-            'full' => $full, 'alt' => (string)($b['title'] ?: 'Banner de ofertas'),
             'campaign' => true, 'kicker' => $b['kicker'], 'title' => $b['title'], 'prefix' => $b['prefix'],
             'mega' => $hl, 'suffix' => $suffix, 'pill' => $b['pill'], 'footnote' => $b['footnote'], 'image' => $b['image'],
             'href' => $link === '' ? url('?o=desconto') : (preg_match('~^https?://~', $link) ? $link : url(ltrim($link, '/'))),
@@ -76,7 +73,7 @@ if ($isHome) {
         foreach ($rows as $b) {
             $pct = discount_pct($b);
             $slides[] = [
-                'full' => false, 'campaign' => false, 'kicker' => $b['cat_name'] ?? 'Achado do dia', 'title' => mb_strimwidth($b['title'], 0, 70, '…'),
+                'campaign' => false, 'kicker' => $b['cat_name'] ?? 'Achado do dia', 'title' => mb_strimwidth($b['title'], 0, 70, '…'),
                 'prefix' => $pct ? 'ATÉ' : '', 'mega' => $pct ? $pct . '%' : money((float)$b['price']), 'suffix' => $pct ? 'OFF' : '',
                 'pill' => ($pct ? 'Por ' . money((float)$b['price']) . ' · ' : '') . 'Ver oferta',
                 'footnote' => '*Preço conferido em ' . date('d/m/Y', strtotime((string)$b['price_updated_at'])) . '. Pode mudar sem aviso.',
@@ -129,12 +126,8 @@ site_header([
     <?php if ($slides): ?>
     <div class="hero-slider" data-slider>
       <?php foreach ($slides as $i => $sl): ?>
-      <a class="slide <?= $i === 0 ? 'on' : '' ?> <?= $sl['campaign'] ? 'campaign' : '' ?> <?= $sl['full'] ? 'full' : '' ?>" href="<?= e($sl['href']) ?>"
+      <a class="slide <?= $i === 0 ? 'on' : '' ?> <?= $sl['campaign'] ? 'campaign' : '' ?>" href="<?= e($sl['href']) ?>"
          <?= $sl['external'] ? 'target="_blank" rel="sponsored nofollow noopener"' : '' ?>>
-        <?php if ($sl['full']): ?>
-        <img class="slide-fill" src="<?= e($sl['image']) ?>" alt="" aria-hidden="true" <?= $i ? 'loading="lazy"' : '' ?>>
-        <img class="slide-art" src="<?= e($sl['image']) ?>" alt="<?= e($sl['alt']) ?>" <?= $i ? 'loading="lazy"' : 'fetchpriority="high"' ?>>
-        <?php else: ?>
         <div class="wrap slide-in">
           <div class="slide-txt">
             <?php if ($sl['campaign']): ?>
@@ -151,7 +144,6 @@ site_header([
           </div>
           <?php if ($sl['image']): ?><div class="slide-img"><img src="<?= e($sl['image']) ?>" alt="" <?= $i ? 'loading="lazy"' : '' ?>></div><?php endif; ?>
         </div>
-        <?php endif; ?>
       </a>
       <?php endforeach; ?>
       <?php if (count($slides) > 1): ?>
@@ -166,21 +158,22 @@ site_header([
   </section>
 
   <div class="wrap home">
-    <!-- ===== Categorias em destaque ===== -->
+    <!-- ===== Atalhos ===== -->
     <section class="shortcuts">
       <?php
+      $wa = setting('whatsapp_group');
       $shortcuts = [
-        ['casa', 'Casa', 'Tudo para deixar seu lar completo.', url('?c=casa-e-cozinha'), 'Ver produtos'],
-        ['ferramentas', 'Ferramentas', 'Equipamentos para obras e projetos.', url('?c=ferramentas'), 'Ver ferramentas'],
-        ['eletronicos', 'Eletrônicos', 'Celulares, notebooks e gadgets em oferta.', url('?c=tecnologia'), 'Ver eletrônicos'],
-        ['moda', 'Moda', 'Roupas, tênis e acessórios com estilo.', url('?c=moda'), 'Ver moda'],
-        ['automotivo', 'Acessórios automotivos', 'Cuidado completo para o seu veículo.', url('?c=acessorios-automotivos'), 'Ver acessórios'],
-        ['ofertas', 'Ofertas exclusivas', 'Os maiores descontos do dia.', url('?o=desconto'), 'Ver ofertas'],
+        ['truck', 'Frete grátis', 'Achados que chegam sem pagar entrega.', url('?frete=1'), 'Mostrar produtos'],
+        ['pct', 'Maiores descontos', 'As quedas de preço mais fortes do dia.', url('?o=desconto'), 'Ver ofertas'],
+        ['coin', 'Até R$100', 'Achados baratinhos que valem a pena.', url('?max=100'), 'Mostrar produtos'],
+        ['fire', 'Mais clicados', 'O que a galera está de olho agora.', url('?o=populares'), 'Ver tendências'],
+        ['ticket', 'Com cupom', 'Ofertas com cupom para pagar menos.', url('?cupom=1'), 'Ver cupons'],
+        ['chat', 'Grupo de ofertas', 'Receba os achados primeiro no celular.', $wa ?: url('?o=desconto'), $wa ? 'Entrar no grupo' : 'Ver ofertas'],
       ];
       foreach ($shortcuts as [$ic, $t, $d, $href, $btn]): ?>
-        <a class="sc" href="<?= e($href) ?>">
+        <a class="sc" href="<?= e($href) ?>" <?= str_starts_with($href, 'http') && !str_starts_with($href, base_url()) ? 'target="_blank" rel="noopener"' : '' ?>>
           <h3><?= e($t) ?></h3>
-          <span class="sc-ill"><img src="<?= e(url('assets/categorias/' . $ic . '.svg')) ?>" alt="" width="120" height="120"></span>
+          <span class="sc-ico"><?= icon($ic) ?></span>
           <p><?= e($d) ?></p>
           <span class="sc-btn"><?= e($btn) ?></span>
         </a>
@@ -208,7 +201,7 @@ site_header([
     <?php endif; ?>
 
     <!-- ===== Prateleiras por categoria ===== -->
-    <?php foreach ($shelves as [$c, $rows]) product_shelf($c['name'], $rows, url('?c=' . $c['slug'])); ?>
+    <?php foreach ($shelves as [$c, $rows]) product_shelf('Achados de ' . $c['name'], $rows, url('?c=' . $c['slug'])); ?>
 
     <!-- ===== Todos ===== -->
     <?php if ($products): ?>
