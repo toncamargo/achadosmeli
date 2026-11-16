@@ -21,7 +21,7 @@ function admin_header(string $title, string $active = ''): void
 <link rel="icon" href="<?= e(url('assets/favicon.svg')) ?>" type="image/svg+xml">
 <link rel="icon" href="<?= e(url('assets/favicon.png')) ?>" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="<?= e(url('assets/apple-touch-icon.png')) ?>">
-<link rel="stylesheet" href="<?= e(url('assets/style.css')) ?>">
+<link rel="stylesheet" href="<?= e(asset('assets/style.css')) ?>">
 </head>
 <body class="admin">
 <header class="adm-top">

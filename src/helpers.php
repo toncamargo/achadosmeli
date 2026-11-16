@@ -40,6 +40,14 @@ function url(string $path = ''): string
     return base_url() . '/' . ltrim($path, '/');
 }
 
+/** URL de arquivo estático com versão (evita cache antigo após publicar). */
+function asset(string $path): string
+{
+    $file = __DIR__ . '/../' . ltrim($path, '/');
+    $v = is_file($file) ? filemtime($file) : time();
+    return url($path) . '?v=' . $v;
+}
+
 function product_url(array $p): string
 {
     return url('produto.php?s=' . rawurlencode($p['slug']));
@@ -179,6 +187,7 @@ function upsert_product(array $d, ?int $categoryId = null): array
             ->execute([$d['title'], $d['price'], $d['original_price'], $d['image'], $d['permalink'],
                 $d['ml_category_id'], $d['free_shipping'] ? 1 : 0, $d['condition'], now(), now(), $existing['id']]);
         if ((float)$existing['price'] !== (float)$d['price']) record_price((int)$existing['id'], (float)$d['price']);
+        update_api_extras((int)$existing['id'], $d, $existing);
         return [(int)$existing['id'], false];
     }
 
@@ -190,7 +199,61 @@ function upsert_product(array $d, ?int $categoryId = null): array
             $d['condition'], now(), now(), now()]);
     $id = (int)$pdo->lastInsertId();
     record_price($id, (float)$d['price']);
+    update_api_extras($id, $d, []);
     return [$id, true];
+}
+
+/**
+ * Grava marca / FULL / parcelas vindos da API.
+ * Marca só é preenchida se estiver vazia (não sobrescreve o que você editou no painel).
+ */
+function update_api_extras(int $id, array $d, array $current): void
+{
+    $set = [];
+    $args = [];
+    if (!empty($d['brand']) && empty($current['brand'])) {
+        $set[] = 'brand = ?'; $args[] = $d['brand'];
+        $set[] = 'brand_verified = ?'; $args[] = !empty($d['brand_verified']) ? 1 : 0;
+    }
+    if (array_key_exists('is_full', $d)) { $set[] = 'is_full = ?'; $args[] = $d['is_full'] ? 1 : 0; }
+    if (!empty($d['installments_qty']) && !empty($d['installments_value'])) {
+        $set[] = 'installments_qty = ?'; $args[] = (int)$d['installments_qty'];
+        $set[] = 'installments_value = ?'; $args[] = (float)$d['installments_value'];
+        $set[] = 'installments_free = ?'; $args[] = !empty($d['installments_free']) ? 1 : 0;
+    }
+    if (!$set) return;
+    $args[] = $id;
+    db()->prepare('UPDATE products SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($args);
+}
+
+/* ---------- Formatação de preço no estilo do card ---------- */
+
+/** "R$ 206,90" e "R$ 212" (sem ,00). */
+function money_short(float $v): string
+{
+    $cents = (int)round(($v - floor($v)) * 100);
+    return 'R$ ' . ($cents === 0 ? number_format(floor($v), 0, ',', '.') : number_format($v, 2, ',', '.'));
+}
+
+/** "R$ 86<sup>99</sup>" */
+function price_html(float $v): string
+{
+    $int = (int)floor($v);
+    $cents = (int)round(($v - $int) * 100);
+    if ($cents === 100) { $int++; $cents = 0; }
+    return 'R$ ' . number_format($int, 0, ',', '.') . ($cents ? '<sup>' . sprintf('%02d', $cents) . '</sup>' : '');
+}
+
+/** Classe de cor do selo da foto. */
+function badge_class(string $badge): string
+{
+    $b = mb_strtoupper($badge);
+    return match (true) {
+        str_contains($b, 'BLACK') => 'bd-black',
+        str_contains($b, 'MAIS VENDIDO') => 'bd-orange',
+        str_contains($b, 'RELÂMPAGO'), str_contains($b, 'RELAMPAGO') => 'bd-red',
+        default => 'bd-blue',
+    };
 }
 
 /**

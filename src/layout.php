@@ -52,8 +52,8 @@ function site_header(array $meta = []): void
 <link rel="apple-touch-icon" href="<?= e(url('assets/apple-touch-icon.png')) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= e(url('assets/style.css')) ?>">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:ital,wght@0,400;0,600;0,700;1,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<?= e(asset('assets/style.css')) ?>">
 <?php if (!empty($meta['jsonld'])): ?>
 <script type="application/ld+json"><?= json_encode($meta['jsonld'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
 <?php endif; ?>
@@ -119,7 +119,7 @@ function site_footer(): void
     <p class="muted">© <?= date('Y') ?> <?= e($site) ?></p>
   </div>
 </footer>
-<script src="<?= e(url('assets/app.js')) ?>" defer></script>
+<script src="<?= e(asset('assets/app.js')) ?>" defer></script>
 </body>
 </html>
 <?php
@@ -127,22 +127,57 @@ function site_footer(): void
 
 function product_card(array $p, string $extra = ''): void
 {
-    $pct = discount_pct($p);
+    $price = (float)$p['price'];
+    $pix = (float)($p['pix_price'] ?? 0);
+    $hasPix = $pix > 0 && $pix < $price;
+    $shown = $hasPix ? $pix : $price;                       // preço em destaque
+    $orig = (float)($p['original_price'] ?? 0);
+    $off = ($orig > $shown && $shown > 0) ? (int)floor((1 - $shown / $orig) * 100) : 0;
+    $rating = $p['rating'] !== null && $p['rating'] !== '' ? (float)$p['rating'] : null;
+    $sold = trim((string)($p['sold_label'] ?? ''));
+    $instQ = (int)($p['installments_qty'] ?? 0);
+    $instV = (float)($p['installments_value'] ?? 0);
+    $coupon = trim((string)($p['coupon_label'] ?? '')) ?: (!empty($p['coupon']) ? 'Cupom ' . $p['coupon'] : '');
+    $delivery = trim((string)($p['delivery_label'] ?? '')) ?: (!empty($p['free_shipping']) ? 'Frete grátis' : '');
+    $badge = trim((string)($p['badge'] ?? ''));
+    $href = product_url($p);
     ?>
-  <article class="card-p <?= e($extra) ?>">
-    <a class="card-img" href="<?= e(product_url($p)) ?>">
+  <article class="pc <?= e($extra) ?>">
+    <div class="pc-img">
       <img src="<?= e($p['image']) ?>" alt="<?= e($p['title']) ?>" loading="lazy">
-    </a>
-    <div class="card-body">
-      <?php if ($pct): ?><s class="old"><?= money((float)$p['original_price']) ?></s><?php endif; ?>
-      <div class="price-line">
-        <b class="now"><?= money((float)$p['price']) ?></b>
-        <?php if ($pct): ?><span class="off"><?= $pct ?>% OFF</span><?php endif; ?>
+      <?php if ($badge !== ''): ?>
+        <span class="pc-badge <?= badge_class($badge) ?>"><?php if (badge_class($badge) === 'bd-black'): ?><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2l1.6 1.2 2-.2.6 1.9 1.7 1.1-.6 1.9.6 1.9-1.7 1.1-.6 1.9-2-.2L8 14.8l-1.6-1.2-2 .2-.6-1.9-1.7-1.1.6-1.9-.6-1.9 1.7-1.1.6-1.9 2 .2z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M5.8 10.2l4.4-4.4" stroke="currentColor" stroke-width="1.2"/><circle cx="6.2" cy="6.2" r=".9" fill="currentColor"/><circle cx="9.8" cy="9.8" r=".9" fill="currentColor"/></svg><?php endif; ?><?= e($badge) ?></span>
+      <?php endif; ?>
+    </div>
+    <div class="pc-body">
+      <h3 class="pc-title"><a href="<?= e($href) ?>"><?= e($p['title']) ?></a></h3>
+      <?php if (!empty($p['brand'])): ?>
+        <span class="pc-brand"><?= e($p['brand']) ?><?php if (!empty($p['brand_verified'])): ?> <svg class="pc-verified" viewBox="0 0 16 16" aria-label="Loja oficial"><path d="M8 0l2 1.6 2.5-.2.7 2.4 2.2 1.3-.9 2.4.9 2.4-2.2 1.3-.7 2.4-2.5-.2L8 16l-2-1.6-2.5.2-.7-2.4L.6 10.9l.9-2.4L.6 6.1l2.2-1.3.7-2.4 2.5.2z" fill="#3483fa"/><path d="M4.8 8.2l2.1 2.1 4.3-4.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><?php endif; ?></span>
+      <?php endif; ?>
+      <?php if ($rating !== null): ?>
+        <span class="pc-rev"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .9l2.2 4.6 5 .7-3.6 3.5.9 5L8 12.3l-4.5 2.4.9-5L.8 6.2l5-.7z" fill="#3483fa"/></svg><span class="pc-rate"><?= number_format($rating, 1, '.', '') ?></span><?php if ($sold !== ''): ?> <span class="pc-sep">|</span> <?= e($sold) ?><?php endif; ?></span>
+      <?php elseif ($sold !== ''): ?>
+        <span class="pc-rev"><?= e($sold) ?></span>
+      <?php endif; ?>
+      <?php if ($off > 0): ?><s class="pc-old"><?= money_short($orig) ?></s><?php endif; ?>
+      <div class="pc-price">
+        <span class="pc-now"><?= price_html($shown) ?></span>
+        <?php if ($off > 0): ?><span class="pc-off"><?= $off ?>% OFF</span><?php endif; ?>
       </div>
-      <?php if ($p['free_shipping']): ?><span class="ship">Frete grátis</span><?php endif; ?>
-      <?php if (!empty($p['coupon'])): ?><span class="cpn">Cupom <?= e($p['coupon']) ?></span><?php endif; ?>
-      <h3><a href="<?= e(product_url($p)) ?>"><?= e($p['title']) ?></a></h3>
-      <a class="cta" href="<?= e(go_url($p)) ?>" target="_blank" rel="sponsored nofollow noopener">Comprar</a>
+      <?php if ($hasPix): ?>
+        <span class="pc-green">no Pix</span>
+        <span class="pc-other">ou <?= money_short($price) ?> em outros meios</span>
+      <?php endif; ?>
+      <?php if ($instQ > 1 && $instV > 0): ?>
+        <span class="<?= !empty($p['installments_free']) ? 'pc-green' : 'pc-other' ?>"><?= !empty($p['installments_free']) ? '' : 'em ' ?><?= $instQ ?>x <?= money_short($instV) ?><?= !empty($p['installments_free']) ? ' sem juros' : '' ?></span>
+      <?php endif; ?>
+      <?php if ($coupon !== ''): ?><span class="pc-coupon"><?= e($coupon) ?></span><?php endif; ?>
+      <?php if ($delivery !== '' || !empty($p['is_full'])): ?>
+        <div class="pc-ship">
+          <?php if ($delivery !== ''): ?><span class="pc-free"><?= e($delivery) ?></span><?php endif; ?>
+          <?php if (!empty($p['is_full'])): ?><span class="pc-full"><svg viewBox="0 0 10 16" aria-hidden="true"><path d="M6.5 0L0 9h4l-1.5 7L10 6H5.6z" fill="currentColor"/></svg>FULL</span><?php endif; ?>
+        </div>
+      <?php endif; ?>
     </div>
   </article>
 <?php

@@ -76,7 +76,8 @@ site_header([
           <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('cp').textContent);this.textContent='Copiado!'">Copiar</button></div>
       <?php endif; ?>
 
-      <a class="cta big" href="<?= e(go_url($p)) ?>" target="_blank" rel="sponsored nofollow noopener">Comprar no Mercado Livre</a>
+      <a class="cta big" href="<?= e(go_url($p)) ?>" target="_blank" rel="sponsored nofollow noopener">Comprar</a>
+      <p class="buy-note">Você finaliza a compra com segurança no Mercado Livre.</p>
       <a class="share" href="https://wa.me/?text=<?= rawurlencode($shareText) ?>" target="_blank" rel="noopener">Compartilhar no WhatsApp</a>
 
       <p class="muted small">Preço conferido em <?= e(date('d/m/Y H:i', strtotime((string)$p['price_updated_at']))) ?>. Pode mudar a qualquer momento.</p>

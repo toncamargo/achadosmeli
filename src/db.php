@@ -113,6 +113,22 @@ function db_migrate(): void
         recorded_at $text NOT NULL
     )$engine");
 
+    // Campos do card de produto (adicionados depois: cria as colunas que faltarem)
+    db_ensure_columns('products', [
+        'badge' => "$text NULL",                 // selo na foto: BLACK FRIDAY, OFERTA DO DIA, MAIS VENDIDO...
+        'brand' => "$text NULL",                 // marca / loja
+        'brand_verified' => 'INT NOT NULL DEFAULT 0',
+        'rating' => 'DECIMAL(2,1) NULL',         // nota (ex.: 4.8)
+        'sold_label' => "$text NULL",            // ex.: +10mil vendidos
+        'pix_price' => 'DECIMAL(12,2) NULL',     // preço no Pix
+        'installments_qty' => 'INT NULL',        // parcelas
+        'installments_value' => 'DECIMAL(12,2) NULL',
+        'installments_free' => 'INT NOT NULL DEFAULT 0', // sem juros
+        'coupon_label' => "$text NULL",          // ex.: R$ 20 OFF com Cupom
+        'delivery_label' => "$text NULL",        // ex.: Chegará grátis amanhã
+        'is_full' => 'INT NOT NULL DEFAULT 0',   // entrega FULL
+    ]);
+
     // Banners do carrossel da home (campanhas: Black Friday, Dia das Mães...)
     $pdo->exec("CREATE TABLE IF NOT EXISTS banners (
         id $pk,
@@ -139,6 +155,18 @@ function db_migrate(): void
         foreach ($defaults as $i => $name) {
             $st->execute([$name, slugify($name), $i]);
         }
+    }
+}
+
+/** Adiciona à tabela as colunas que ainda não existem (migração simples). */
+function db_ensure_columns(string $table, array $columns): void
+{
+    $pdo = db();
+    $existing = db_is_mysql()
+        ? array_column($pdo->query("SHOW COLUMNS FROM $table")->fetchAll(), 'Field')
+        : array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(), 'name');
+    foreach ($columns as $name => $def) {
+        if (!in_array($name, $existing, true)) $pdo->exec("ALTER TABLE $table ADD COLUMN $name $def");
     }
 }
 

@@ -190,7 +190,7 @@ final class MercadoLivre
             'ml_category_id' => $r['category_id'] ?? null,
             'free_shipping' => (bool)($r['shipping']['free_shipping'] ?? false),
             'condition' => $r['condition'] ?? null,
-        ];
+        ] + self::extras($r);
     }
 
     private static function normalizeItem(array $it): array
@@ -206,6 +206,24 @@ final class MercadoLivre
             'ml_category_id' => $it['category_id'] ?? null,
             'free_shipping' => (bool)($it['shipping']['free_shipping'] ?? false),
             'condition' => $it['condition'] ?? null,
+        ] + self::extras($it);
+    }
+
+    /** Campos extras do card: marca, FULL e parcelas (quando a API informa). */
+    private static function extras(array $r): array
+    {
+        $brand = null;
+        foreach ($r['attributes'] ?? [] as $a) {
+            if (($a['id'] ?? '') === 'BRAND' && !empty($a['value_name'])) { $brand = $a['value_name']; break; }
+        }
+        $inst = $r['installments'] ?? null;
+        return [
+            'brand' => $brand ?? ($r['official_store_name'] ?? null),
+            'brand_verified' => !empty($r['official_store_id']) || !empty($r['official_store_name']),
+            'is_full' => ($r['shipping']['logistic_type'] ?? '') === 'fulfillment',
+            'installments_qty' => $inst['quantity'] ?? null,
+            'installments_value' => isset($inst['amount']) ? (float)$inst['amount'] : null,
+            'installments_free' => isset($inst['rate']) && (float)$inst['rate'] == 0.0,
         ];
     }
 
