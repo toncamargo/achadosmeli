@@ -48,9 +48,13 @@ function asset(string $path): string
     return url($path) . '?v=' . $v;
 }
 
+/**
+ * O site não tem página de produto: todo link de produto leva ao Mercado Livre
+ * passando por ir.php (que conta o clique e redireciona para o link de afiliado).
+ */
 function product_url(array $p): string
 {
-    return url('produto.php?s=' . rawurlencode($p['slug']));
+    return go_url($p);
 }
 
 function go_url(array $p): string
@@ -285,7 +289,14 @@ function refresh_prices(array $mlIds): int
         }
     }
     foreach ($catalog as $id) {
-        try { upsert_product(MercadoLivre::fetch($id, true)); $n++; } catch (Throwable) { /* ignora um item com erro */ }
+        try {
+            $d = MercadoLivre::fetch($id, true);
+            if ((float)$d['price'] > 0) upsert_product($d);
+            if (($d['status'] ?? 'active') !== 'active') {
+                db()->prepare('UPDATE products SET active = 0 WHERE ml_id = ?')->execute([$id]);
+            }
+            $n++;
+        } catch (Throwable) { /* ignora um item com erro */ }
     }
     return $n;
 }

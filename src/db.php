@@ -127,7 +127,67 @@ function db_migrate(): void
         'coupon_label' => "$text NULL",          // ex.: R$ 20 OFF com Cupom
         'delivery_label' => "$text NULL",        // ex.: Chegará grátis amanhã
         'is_full' => 'INT NOT NULL DEFAULT 0',   // entrega FULL
+        'source_id' => 'INT NULL',               // fonte da coleta automática que trouxe o produto
+        // Agente coletor (agente/): dados lidos da página do produto e do painel "Compartilhar" de afiliados
+        'item_id' => "$text NULL",               // anúncio vencedor (MLB...) quando ml_id é de catálogo (/p/)
+        'images' => 'TEXT NULL',                 // JSON com os links de todas as fotos (não baixadas)
+        'affiliate_code' => "$text NULL",        // "ID do produto" do painel de afiliados (ex.: 9PDZND-9N3K)
+        'affiliate_text' => 'TEXT NULL',         // texto sugerido do painel de afiliados
+        'affiliate_tag' => "$text NULL",         // etiqueta em uso no link
+        'discount_label' => "$text NULL",        // ex.: 39% OFF
+        'reviews_count' => 'INT NULL',           // nº de avaliações
+        'store_name' => "$text NULL",            // loja vendedora
+        'ml_breadcrumb' => "$text NULL",         // categoria no ML (Ferramentas > Ferramentas Manuais > ...)
+        'highlights' => 'TEXT NULL',             // JSON "O que você precisa saber"
+        'collected_at' => "$text NULL",          // última coleta pelo agente
     ]);
+
+    // Agente coletor: um registro por produto coletado por dia (controle das 5 ofertas por categoria)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS agente_coletas (
+        id $pk,
+        run_date $text NOT NULL,
+        category_id INT NULL,
+        ml_id $text NOT NULL,
+        position INT NULL,
+        offers_label $text NULL,
+        affiliate_url $text NULL,
+        collected_at $text NOT NULL
+    )$engine");
+
+    // Coleta automática: fontes (palavra-chave ou mais vendidos de uma categoria do ML)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ml_sources (
+        id $pk,
+        name $text NOT NULL,
+        type $text NOT NULL DEFAULT 'keyword',
+        query $text NULL,
+        ml_category_id $text NULL,
+        category_id INT NULL,
+        min_discount INT NOT NULL DEFAULT 0,
+        min_price DECIMAL(12,2) NULL,
+        max_price DECIMAL(12,2) NULL,
+        free_shipping_only INT NOT NULL DEFAULT 0,
+        full_only INT NOT NULL DEFAULT 0,
+        exclude_words TEXT NULL,
+        max_items INT NOT NULL DEFAULT 20,
+        auto_publish INT NOT NULL DEFAULT 0,
+        every_hours INT NOT NULL DEFAULT 12,
+        active INT NOT NULL DEFAULT 1,
+        last_run_at $text NULL,
+        last_status $text NULL,
+        created_at $text NOT NULL
+    )$engine");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ml_collect_log (
+        id $pk,
+        source_id INT NULL,
+        started_at $text NOT NULL,
+        finished_at $text NULL,
+        found INT NOT NULL DEFAULT 0,
+        created INT NOT NULL DEFAULT 0,
+        updated INT NOT NULL DEFAULT 0,
+        skipped INT NOT NULL DEFAULT 0,
+        errors TEXT NULL
+    )$engine");
 
     // Banners do carrossel da home (campanhas: Black Friday, Dia das Mães...)
     $pdo->exec("CREATE TABLE IF NOT EXISTS banners (

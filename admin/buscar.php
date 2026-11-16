@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$c, $u, $errs] = import_refs($refs, $cat);
         flash("Importação concluída: $c novo(s), $u atualizado(s).");
         foreach ($errs as $er) flash($er, 'err');
-        if ($c > 0) flash('Lembre de colar o link de afiliado (meli.la) de cada produto novo — eles aparecem marcados na lista.', 'warn');
+        if ($c > 0 && !(setting('aff_matt_word') && setting('aff_matt_tool'))) flash('Lembre de colar o link de afiliado (meli.la) de cada produto novo — eles aparecem marcados na lista.', 'warn');
     } else {
         flash('Nenhum produto selecionado.', 'warn');
     }

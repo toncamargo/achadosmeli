@@ -80,7 +80,7 @@ if ($isHome) {
                 'prefix' => $pct ? 'ATÉ' : '', 'mega' => $pct ? $pct . '%' : money((float)$b['price']), 'suffix' => $pct ? 'OFF' : '',
                 'pill' => ($pct ? 'Por ' . money((float)$b['price']) . ' · ' : '') . 'Ver oferta',
                 'footnote' => '*Preço conferido em ' . date('d/m/Y', strtotime((string)$b['price_updated_at'])) . '. Pode mudar sem aviso.',
-                'image' => $b['image'], 'href' => product_url($b), 'external' => false,
+                'image' => $b['image'], 'href' => go_url($b), 'external' => true,
             ];
         }
     }
@@ -109,7 +109,7 @@ if (!$isHome) {
         $cupom => 'Achados com cupom',
         $frete => 'Achados com frete grátis',
         $max > 0 => 'Achados até ' . money($max),
-        $sort === 'desconto' => 'Ofertas: maiores descontos',
+        $sort === 'desconto' => 'Ofertas',
         $sort === 'populares' => 'Mais clicados',
         default => 'Todos os achados',
     };
@@ -207,8 +207,17 @@ site_header([
     </section>
     <?php endif; ?>
 
-    <!-- ===== Prateleiras por categoria ===== -->
-    <?php foreach ($shelves as [$c, $rows]) product_shelf($c['name'], $rows, url('?c=' . $c['slug'])); ?>
+    <!-- ===== Anúncios: 2 banners lado a lado ===== -->
+    <?php ad_section_duplo(); ?>
+
+    <!-- ===== Prateleiras por categoria (banner largo e painel de 3 cards no meio) ===== -->
+    <?php foreach ($shelves as $si => [$c, $rows]) {
+        product_shelf($c['name'], $rows, url('?c=' . $c['slug']));
+        if ($si === 1) ad_section_largo();
+        if ($si === 3) ad_section_trio();
+    }
+    if (count($shelves) < 2) ad_section_largo();
+    if (count($shelves) < 4) ad_section_trio(); ?>
 
     <!-- ===== Todos ===== -->
     <?php if ($products): ?>
@@ -223,10 +232,57 @@ site_header([
 
 <?php else: ?>
 
+<?php
+  /* ---------- cabeçalho das páginas de categoria (abas com ícones) ---------- */
+  $tabIcons = [
+    'todas' => '<path d="M26 6h14v14L22 38a3 3 0 0 1-4 0l-8-8a3 3 0 0 1 0-4z"/><circle cx="34" cy="12" r="2"/><path d="M18 30l8-8"/><circle cx="19" cy="23" r="2"/><circle cx="25.5" cy="29.5" r="2"/>',
+    'casa-e-cozinha' => '<path d="M6 22 24 7l18 15"/><path d="M11 18v22h26V18"/><path d="M20 40V28h8v12"/>',
+    'tecnologia' => '<rect x="9" y="11" width="30" height="20" rx="2"/><path d="M4 37h40l-2-6H6z"/>',
+    'moda' => '<path d="M17 7 6 13l4 9 5-2v21h18V20l5 2 4-9-11-6c-1 4-4 6-7 6s-6-2-7-6z"/>',
+    'beleza' => '<path d="M19 22h10v20H19z"/><path d="M21 22V11l6-4v15"/><path d="M16 42h16"/>',
+    'esporte' => '<circle cx="24" cy="24" r="17"/><path d="M24 7v34M7 24h34"/><path d="M12 12c6 6 6 18 0 24M36 12c-6 6-6 18 0 24"/>',
+    'games' => '<path d="M14 16h20c5 0 8 4 9 10l1 6c1 5-4 7-7 3l-4-5H15l-4 5c-3 4-8 2-7-3l1-6c1-6 4-10 9-10z"/><path d="M15 21v6M12 24h6"/><circle cx="32" cy="22" r="1.5"/><circle cx="35" cy="26" r="1.5"/>',
+    'bebes-e-criancas' => '<path d="M20 6h8v5h-8z"/><path d="M18 11h12l2 6v23a2 2 0 0 1-2 2H18a2 2 0 0 1-2-2V17z"/><path d="M16 24h6M16 30h6M16 36h6"/>',
+    'ferramentas' => '<path d="M30 6a10 10 0 0 0-9 14L7 34a4 4 0 0 0 6 6l14-14a10 10 0 0 0 14-9l-6 6-5-1-1-5z"/>',
+    'pet' => '<circle cx="13" cy="21" r="3.5"/><circle cx="19.5" cy="12.5" r="3.5"/><circle cx="28.5" cy="12.5" r="3.5"/><circle cx="35" cy="21" r="3.5"/><path d="M24 22c-6 0-11 8-11 13 0 4 4 5 7 4s5-1 8 0 7 0 7-4c0-5-5-13-11-13z"/>',
+    'acessorios-automotivos' => '<path d="M8 29l4-10a3 3 0 0 1 3-2h18a3 3 0 0 1 3 2l4 10"/><rect x="6" y="28" width="36" height="10" rx="3"/><path d="M10 38v4h6v-4M32 38v4h6v-4"/><circle cx="13" cy="33" r="1.5"/><circle cx="35" cy="33" r="1.5"/>',
+    '_' => '<path d="M10 16h28l-2 26H12z"/><path d="M18 16v-3a6 6 0 0 1 12 0v3"/><text x="24" y="33" text-anchor="middle" font-size="8" font-weight="700" fill="currentColor" stroke="none" font-family="Inter,sans-serif">SALE</text>',
+  ];
+  $tabText = [
+    'casa-e-cozinha' => ['Tudo para deixar seu lar completo.', 'Achados novos todos os dias.'],
+    'tecnologia' => ['Celulares, notebooks e gadgets em oferta.', 'Preços conferidos diariamente.'],
+    'moda' => ['Roupas, tênis e acessórios com estilo.', 'Novidades todos os dias.'],
+    'ferramentas' => ['Equipamentos para obras e projetos.', 'Ofertas novas todos os dias.'],
+    'acessorios-automotivos' => ['Cuidado completo para o seu veículo.', 'Ofertas novas todos os dias.'],
+  ];
+  $bandTxt = $currentCat ? ($tabText[$currentCat['slug']] ?? null) : null;
+  $bandTxt ??= ['Aproveite esses preços agora mesmo!', 'Novas ofertas todos os dias.'];
+  $tabSvg = fn($k) => '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . ($tabIcons[$k] ?? $tabIcons['_']) . '</svg>';
+  ?>
+  <section class="cat-band">
+    <div class="wrap cat-band-in">
+      <div class="cat-band-txt">
+        <h1><?= e($title) ?></h1>
+        <p><?= e($bandTxt[0]) ?><br><?= e($bandTxt[1]) ?></p>
+      </div>
+      <div class="cat-tabs" data-tabs>
+        <button class="ct-arrow prev" type="button" aria-label="Anterior" hidden><?= icon('chevl') ?></button>
+        <nav class="ct-track" aria-label="Categorias">
+          <a class="ct <?= $currentCat ? '' : 'on' ?>" href="<?= e($qs(['c' => '', 'p' => ''])) ?>" <?= $currentCat ? '' : 'aria-current="page"' ?>>
+            <span class="ct-ico"><?= $tabSvg('todas') ?></span><span class="ct-lbl">Todas as ofertas</span></a>
+          <?php foreach ($cats as $c): $on = $currentCat && $currentCat['id'] === $c['id']; ?>
+          <a class="ct <?= $on ? 'on' : '' ?>" href="<?= e($qs(['c' => $c['slug'], 'p' => ''])) ?>" <?= $on ? 'aria-current="page"' : '' ?>>
+            <span class="ct-ico"><?= $tabSvg($c['slug']) ?></span><span class="ct-lbl"><?= e($c['name']) ?></span></a>
+          <?php endforeach; ?>
+        </nav>
+        <button class="ct-arrow next" type="button" aria-label="Próximo"><?= icon('chev') ?></button>
+      </div>
+    </div>
+  </section>
+
   <div class="wrap listing">
     <div class="list-head">
       <div>
-        <h1><?= e($title) ?></h1>
         <span class="muted"><?= $total ?> resultado<?= $total === 1 ? '' : 's' ?></span>
       </div>
       <form class="sort" method="get">

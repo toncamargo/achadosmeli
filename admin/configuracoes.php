@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/../src/bootstrap.php';
 require __DIR__ . '/../src/admin_layout.php';
+require_once __DIR__ . '/../src/ads.php';
 require_admin();
 csrf_check();
 
@@ -22,10 +23,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'disconnect') {
         MercadoLivre::disconnect();
         flash('Conta desconectada.');
+    } elseif ($action === 'test') {
+        try {
+            $me = MercadoLivre::me();
+            flash('Conexão OK: conta ' . ($me['nickname'] ?? $me['id'] ?? '?') . '.');
+            try {
+                $r = MercadoLivre::search('fone bluetooth', 0, 1);
+                flash($r['mode'] === 'items'
+                    ? 'Busca de anúncios liberada para o seu app (busca completa, com preço).'
+                    : 'Busca de anúncios bloqueada pelo ML para o seu app: a busca usa o catálogo. Use "Mais vendidos" na Coleta automática para os melhores resultados.',
+                    $r['mode'] === 'items' ? 'ok' : 'warn');
+            } catch (Throwable $ex) {
+                flash('Busca falhou: ' . $ex->getMessage(), 'err');
+            }
+            try {
+                $h = MercadoLivre::highlights('MLB1574'); // Casa, Móveis e Decoração
+                flash('Mais vendidos liberado (' . count($h) . ' produtos em Casa, Móveis e Decoração).');
+            } catch (Throwable $ex) {
+                flash('Mais vendidos falhou: ' . $ex->getMessage(), 'err');
+            }
+        } catch (Throwable $ex) {
+            flash('Falha na conexão: ' . $ex->getMessage(), 'err');
+        }
     } elseif ($action === 'aff') {
-        setting_set('aff_matt_word', trim((string)$_POST['aff_matt_word']));
-        setting_set('aff_matt_tool', trim((string)$_POST['aff_matt_tool']));
+        $link = trim((string)($_POST['aff_link'] ?? ''));
+        $word = trim((string)$_POST['aff_matt_word']);
+        $tool = trim((string)$_POST['aff_matt_tool']);
+        if ($link !== '') {
+            $found = MercadoLivre::affiliateParams($link);
+            if ($found['matt_word'] || $found['matt_tool']) {
+                $word = $found['matt_word'] ?? $word;
+                $tool = $found['matt_tool'] ?? $tool;
+                flash('Parâmetros lidos do seu link: matt_word=' . ($found['matt_word'] ?? '—') . ', matt_tool=' . ($found['matt_tool'] ?? '—') . '.',
+                    $found['matt_word'] && $found['matt_tool'] ? 'ok' : 'warn');
+            } else {
+                flash('Não encontrei matt_word/matt_tool nesse link. Abra o link no navegador, copie a URL final '
+                    . '(a página do produto, com os parâmetros) e cole aqui.', 'err');
+            }
+        }
+        setting_set('aff_matt_word', $word);
+        setting_set('aff_matt_tool', $tool);
         flash('Parâmetros de afiliado salvos.');
+    } elseif ($action === 'adsense') {
+        $client = trim((string)($_POST['adsense_client'] ?? ''));
+        if (preg_match('/^pub-\d+$/', $client)) $client = 'ca-' . $client;
+        if ($client !== '' && !preg_match('/^ca-pub-\d{10,20}$/', $client)) {
+            flash('ID de editor inválido. Use o formato ca-pub-1234567890123456.', 'err');
+            redirect(url('admin/configuracoes.php#adsense'));
+        }
+        setting_set('adsense_client', $client);
+        foreach (array_keys(AD_SLOTS) as $k) {
+            setting_set($k, preg_replace('/\D/', '', (string)($_POST[$k] ?? '')));
+        }
+        setting_set('ads_trio_title', trim((string)($_POST['ads_trio_title'] ?? '')));
+        flash('Anúncios do Google salvos.');
     } elseif ($action === 'password') {
         $p = (string)$_POST['new_password'];
         if (!password_verify((string)$_POST['current_password'], (string)setting('admin_password_hash'))) {
@@ -72,7 +123,9 @@ admin_header('Configurações', 'config');
   <hr>
   <?php if (MercadoLivre::isConnected()): ?>
     <p class="ok-text">✅ Conectado (usuário ML <?= e(setting('ml_user_id')) ?>)</p>
-    <form method="post" data-confirm="Desconectar a conta?">
+    <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="test">
+      <button class="btn btn-sm btn-primary">Testar conexão</button></form>
+    <form method="post" data-confirm="Desconectar a conta?" style="display:inline">
       <?= csrf_field() ?><input type="hidden" name="action" value="disconnect">
       <button class="btn btn-sm">Desconectar</button>
     </form>
@@ -90,12 +143,31 @@ admin_header('Configurações', 'config');
   <p class="muted">O jeito mais seguro é gerar o link de cada produto no
     <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener">painel de afiliados</a>
     (link <code>meli.la/...</code>) e colar na tela de edição do produto.</p>
-  <p class="muted">Opcional: se seus links gerados trazem os parâmetros <code>matt_word</code> e <code>matt_tool</code>,
-    informe-os aqui para que produtos <b>sem link colado</b> recebam esses parâmetros automaticamente.
-    Confira com um link real do seu painel antes de confiar nisso.</p>
+  <p class="muted"><b>Link automático (recomendado para a coleta):</b> gere um link de afiliado de qualquer produto e cole abaixo.
+    O site lê os parâmetros <code>matt_word</code> e <code>matt_tool</code> dele e aplica em todos os produtos
+    <b>sem link colado</b> — inclusive os que a coleta automática traz.
+    Depois, teste: clique em "Comprar" no site em uma aba anônima e confira se a URL do ML chega com esses parâmetros.</p>
+  <label>Seu link de afiliado (meli.la/... ou a URL completa)
+    <input name="aff_link" placeholder="https://meli.la/xxxxxxx"></label>
+  <p class="muted small">Ou preencha manualmente:</p>
   <label>matt_word <input name="aff_matt_word" value="<?= e(setting('aff_matt_word')) ?>"></label>
   <label>matt_tool <input name="aff_matt_tool" value="<?= e(setting('aff_matt_tool')) ?>"></label>
   <button class="btn">Salvar</button>
+</form>
+
+<form method="post" class="card" id="adsense">
+  <?= csrf_field() ?><input type="hidden" name="action" value="adsense">
+  <h2>Google AdSense (banners da home)</h2>
+  <p class="muted">Cole o ID de editor e o <b>ID de cada bloco de anúncio</b> (em AdSense › Anúncios › Por bloco de anúncios › Anúncio display).
+    Espaço sem ID não aparece para o visitante; logado no admin, você vê onde ele fica.</p>
+  <label>ID de editor <input name="adsense_client" value="<?= e(setting('adsense_client')) ?>" placeholder="ca-pub-1234567890123456"></label>
+  <?php foreach (AD_SLOTS as $k => [$name, $size]): ?>
+    <label><?= e($name) ?> <small class="muted">(<?= e($size) ?>)</small>
+      <input name="<?= $k ?>" value="<?= e(setting($k)) ?>" placeholder="ID do bloco, ex.: 1234567890" inputmode="numeric"></label>
+  <?php endforeach; ?>
+  <label>Título do painel de 3 cards <input name="ads_trio_title" value="<?= e(setting('ads_trio_title')) ?>" placeholder="Recomendados para você"></label>
+  <p class="muted small">O arquivo <code><?= e(url('ads.txt')) ?></code> é gerado sozinho com o seu ID — o AdSense exige ele para liberar os anúncios.</p>
+  <button class="btn btn-primary">Salvar anúncios</button>
 </form>
 
 <form method="post" class="card">

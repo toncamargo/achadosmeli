@@ -1,0 +1,98 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Espaços de anúncio do Google AdSense na home.
+ * Os IDs são configurados em Admin › Configurações › Google AdSense.
+ * Sem configuração, o espaço some para o visitante e aparece como "reservado" só para o admin logado.
+ */
+const AD_SLOTS = [
+    'ad_slot_duplo_1' => ['Dois banners lado a lado — esquerdo', '≈ 580×130'],
+    'ad_slot_duplo_2' => ['Dois banners lado a lado — direito', '≈ 580×130'],
+    'ad_slot_largo'   => ['Banner largo', '≈ 1170×280'],
+    'ad_slot_trio_1'  => ['Painel com 3 cards — 1º', '≈ 360×250'],
+    'ad_slot_trio_2'  => ['Painel com 3 cards — 2º', '≈ 360×250'],
+    'ad_slot_trio_3'  => ['Painel com 3 cards — 3º', '≈ 360×250'],
+];
+
+function adsense_client(): ?string
+{
+    $c = trim((string)setting('adsense_client'));
+    return preg_match('/^ca-pub-\d{10,20}$/', $c) ? $c : null;
+}
+
+function ads_preview(): bool
+{
+    if (session_status() === PHP_SESSION_NONE && isset($_COOKIE[session_name()]) && !headers_sent()) @session_start();
+    return function_exists('is_admin') && is_admin();
+}
+
+/**
+ * Banners de teste (marcas fictícias) para ver o layout antes de configurar o AdSense.
+ * Aparecem para o admin logado ou com ?ads=teste na URL; ?ads=off esconde. Somem quando o AdSense é configurado.
+ */
+function ads_demo(): bool
+{
+    $q = (string)($_GET['ads'] ?? '');
+    if ($q === 'off') return false;
+    return $q === 'teste' || ads_preview();
+}
+
+/** Script do AdSense para o <head> (só quando há ID de editor configurado). */
+function adsense_head(): string
+{
+    $c = adsense_client();
+    return $c ? '<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' . e($c) . '" crossorigin="anonymous"></script>' : '';
+}
+
+/** HTML de um espaço de anúncio, ou '' quando não há nada para mostrar. */
+function ad_unit(string $key): string
+{
+    $client = adsense_client();
+    $slot = trim((string)setting($key));
+    if ($client && preg_match('/^\d{6,20}$/', $slot)) {
+        return '<div class="ad-box"><span class="ad-tag">Publicidade</span>'
+            . '<ins class="adsbygoogle" style="display:block;width:100%;height:100%" data-ad-client="' . e($client) . '" data-ad-slot="' . e($slot) . '"></ins>'
+            . '<script>(adsbygoogle = window.adsbygoogle || []).push({});</script></div>';
+    }
+    if (ads_demo()) {
+        $file = ['ad_slot_duplo_1' => 'duplo-1', 'ad_slot_duplo_2' => 'duplo-2', 'ad_slot_largo' => 'largo',
+                 'ad_slot_trio_1' => 'trio-1', 'ad_slot_trio_2' => 'trio-2', 'ad_slot_trio_3' => 'trio-3'][$key] ?? null;
+        if ($file) {
+            return '<div class="ad-box ad-demo"><span class="ad-tag">Publicidade · teste</span>'
+                . '<img src="' . e(url('assets/ads-teste/' . $file . '.svg')) . '" alt="Banner de teste" loading="lazy"></div>';
+        }
+    }
+    if (ads_preview()) {
+        [$name, $size] = AD_SLOTS[$key] ?? [$key, ''];
+        return '<a class="ad-box ad-empty" href="' . e(url('admin/configuracoes.php#adsense')) . '"><span>Espaço para anúncio Google'
+            . '<small>' . e($name) . ' · ' . e($size) . '<br>Configure em Admin › Configurações (só você vê este aviso)</small></span></a>';
+    }
+    return '';
+}
+
+/** Seção com 2 banners lado a lado. */
+function ad_section_duplo(): void
+{
+    $a = ad_unit('ad_slot_duplo_1'); $b = ad_unit('ad_slot_duplo_2');
+    if ($a === '' && $b === '') return;
+    echo '<section class="ads ads-duplo">' . $a . $b . '</section>';
+}
+
+/** Seção com 1 banner largo. */
+function ad_section_largo(): void
+{
+    $a = ad_unit('ad_slot_largo');
+    if ($a === '') return;
+    echo '<section class="ads ads-largo">' . $a . '</section>';
+}
+
+/** Painel branco com título e 3 cards de anúncio. */
+function ad_section_trio(): void
+{
+    $units = array_filter([ad_unit('ad_slot_trio_1'), ad_unit('ad_slot_trio_2'), ad_unit('ad_slot_trio_3')]);
+    if (!$units) return;
+    $title = setting('ads_trio_title', 'Recomendados para você');
+    echo '<section class="panel ads-trio"><div class="panel-head"><h2>' . e($title) . '</h2></div>'
+        . '<div class="ads-trio-row">' . implode('', $units) . '</div></section>';
+}

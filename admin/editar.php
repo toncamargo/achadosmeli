@@ -135,7 +135,7 @@ admin_header('Editar produto', 'produtos');
     </div>
     <div class="row">
       <button class="btn btn-primary">Salvar</button>
-      <a class="btn" href="<?= e(product_url($p)) ?>" target="_blank">Ver no site ↗</a>
+      <a class="btn" href="<?= e(product_url($p)) ?>" target="_blank" rel="noopener">Ver no Mercado Livre ↗</a>
     </div>
   </form>
 

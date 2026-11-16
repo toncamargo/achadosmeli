@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/ads.php';
 
 /** Ícones SVG próprios (traço simples), usados nos atalhos da home. */
 function icon(string $name): string
@@ -57,6 +58,7 @@ function site_header(array $meta = []): void
 <?php if (!empty($meta['jsonld'])): ?>
 <script type="application/ld+json"><?= json_encode($meta['jsonld'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
 <?php endif; ?>
+<?= adsense_head() ?>
 </head>
 <body>
 <header class="top">
@@ -64,8 +66,8 @@ function site_header(array $meta = []): void
     <a class="brand" href="<?= e(url('')) ?>" aria-label="<?= e($site) ?> — início">
       <img src="<?= e(url('assets/logo.png')) ?>" alt="<?= e($site) ?>" width="144" height="40">
     </a>
-    <form class="search" action="<?= e(url('')) ?>" method="get" role="search">
-      <input name="q" value="<?= e($q) ?>" placeholder="Buscar produtos, marcas e muito mais…" aria-label="Buscar">
+    <form class="search" action="<?= e(url('')) ?>" method="get" role="search" data-suggest="<?= e(url('sugestoes.php')) ?>">
+      <input name="q" value="<?= e($q) ?>" autocomplete="off" placeholder="Buscar produtos, marcas e muito mais…" aria-label="Buscar">
       <button aria-label="Buscar"><?= icon('search') ?></button>
     </form>
     <?php if ($wa = setting('whatsapp_group')): ?>
@@ -75,7 +77,7 @@ function site_header(array $meta = []): void
     <?php endif; ?>
   </div>
   <div class="wrap nav-row">
-    <span class="nav-hint">Site independente<br><b>de achados afiliados Mercado Livre</b></span>
+    <span class="nav-hint">Site independente<br><b>afiliado Mercado Livre</b></span>
     <nav class="nav-main">
       <?php if ($cats): ?>
       <details class="cat-menu">
@@ -106,17 +108,65 @@ function site_footer(): void
     $site = setting('site_name', 'Achados Meli');
     ?>
 <footer class="foot">
-  <div class="wrap">
-    <div class="foot-links">
-      <?php if ($l = setting('whatsapp_group')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">WhatsApp</a><?php endif; ?>
-      <?php if ($l = setting('telegram_channel')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Telegram</a><?php endif; ?>
-      <?php if ($l = setting('instagram')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Instagram</a><?php endif; ?>
+  <section class="foot-info">
+    <div class="wrap foot-cols">
+      <div class="fcol">
+        <svg class="fico" viewBox="0 0 120 100" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+          <rect x="14" y="14" width="92" height="68" rx="5"/><path d="M14 30h92"/><circle cx="24" cy="22" r="2" fill="#333"/><circle cx="32" cy="22" r="2" fill="#333"/>
+          <path d="M52 60l-5 5a8 8 0 0 1-11-11l8-8a8 8 0 0 1 11 0" stroke="#3483fa" stroke-width="4"/>
+          <path d="M68 46l5-5a8 8 0 0 1 11 11l-8 8a8 8 0 0 1-11 0" stroke="#3483fa" stroke-width="4"/>
+          <path d="M53 59l14-14" stroke="#3483fa" stroke-width="4"/>
+        </svg>
+        <h3>Site de afiliado</h3>
+        <p>Somos um site independente que reúne achados do Mercado Livre. Podemos ganhar uma comissão pelas compras, sem nenhum custo extra para você.</p>
+        <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener">Conheça o Programa de Afiliados</a>
+      </div>
+      <div class="fcol">
+        <svg class="fico" viewBox="0 0 120 100" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+          <path d="M16 20h12l10 44h46l10-32H34"/><circle cx="44" cy="76" r="5"/><circle cx="78" cy="76" r="5"/>
+          <path d="M70 12h24v24" stroke="#3483fa" stroke-width="4"/><path d="M94 12 66 40" stroke="#3483fa" stroke-width="4"/>
+        </svg>
+        <h3>Compra feita no Mercado Livre</h3>
+        <p>Ao clicar em um produto, você é redirecionado para o Mercado Livre. Pagamento, entrega, trocas e atendimento acontecem direto por lá.</p>
+        <a href="<?= e(url('?o=desconto')) ?>">Ver as ofertas do dia</a>
+      </div>
+      <div class="fcol">
+        <svg class="fico" viewBox="0 0 120 100" fill="none" stroke="#333" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+          <path d="M60 8 86 18v26c0 22-12 36-26 46C46 80 34 66 34 44V18z"/>
+          <path d="M48 48l9 9 17-19" stroke="#3483fa" stroke-width="6"/>
+        </svg>
+        <h3>Segurança, do início ao fim</h3>
+        <p>Aqui você não faz cadastro nem informa senha ou dados de pagamento. Sua compra conta com as proteções do próprio Mercado Livre.</p>
+        <a href="#mais-info" data-open-more>Como funciona</a>
+      </div>
     </div>
-    <p><b><?= e($site) ?></b> participa do Programa de Afiliados do Mercado Livre e pode receber comissão
-      pelas compras feitas a partir dos links deste site, sem custo extra para você.
-      Este não é um site oficial do Mercado Livre. Preços e disponibilidade podem mudar a qualquer momento;
-      o valor válido é sempre o exibido no Mercado Livre na hora da compra.</p>
-    <p class="muted">© <?= date('Y') ?> <?= e($site) ?></p>
+  </section>
+  <details class="foot-more" id="mais-info">
+    <summary>Mais informações</summary>
+    <div class="wrap foot-more-in">
+      <p><b><?= e($site) ?></b> participa do Programa de Afiliados do Mercado Livre e pode receber comissão
+        pelas compras feitas a partir dos links deste site, sem custo extra para você.
+        Este não é um site oficial do Mercado Livre. Preços e disponibilidade podem mudar a qualquer momento;
+        o valor válido é sempre o exibido no Mercado Livre na hora da compra.</p>
+      <p>Não vendemos nem entregamos produtos e não recebemos pagamentos. Dúvidas sobre pedidos, entregas e devoluções
+        devem ser tratadas com o vendedor pelo Mercado Livre.</p>
+    </div>
+  </details>
+  <div class="foot-bottom">
+    <div class="wrap">
+      <nav class="foot-links">
+        <a href="<?= e(url('?o=desconto')) ?>">Ofertas</a>
+        <a href="<?= e(url('?cupom=1')) ?>">Cupons</a>
+        <a href="<?= e(url('?frete=1')) ?>">Frete grátis</a>
+        <a href="<?= e(url('?o=populares')) ?>">Mais clicados</a>
+        <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener">Programa de Afiliados</a>
+        <?php if ($l = setting('whatsapp_group')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">WhatsApp</a><?php endif; ?>
+        <?php if ($l = setting('telegram_channel')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Telegram</a><?php endif; ?>
+        <?php if ($l = setting('instagram')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Instagram</a><?php endif; ?>
+      </nav>
+      <p>Copyright © <?= date('Y') ?> <?= e($site) ?>.</p>
+      <p>Site independente de afiliados — não é o site oficial do Mercado Livre. Mercado Livre é marca de seus respectivos donos.</p>
+    </div>
   </div>
 </footer>
 <script src="<?= e(asset('assets/app.js')) ?>" defer></script>
@@ -139,6 +189,12 @@ function product_card(array $p, string $extra = ''): void
     $instV = (float)($p['installments_value'] ?? 0);
     $coupon = trim((string)($p['coupon_label'] ?? '')) ?: (!empty($p['coupon']) ? 'Cupom ' . $p['coupon'] : '');
     $delivery = trim((string)($p['delivery_label'] ?? '')) ?: (!empty($p['free_shipping']) ? 'Frete grátis' : '');
+    // textos que vêm do Mercado Livre todo em maiúsculas ("FRETE GRÁTIS ACIMA DE R$ 19") viram "Frete grátis acima de R$ 19"
+    if ($delivery !== '' && preg_match('/\p{Lu}{3}/u', $delivery) && mb_strtoupper($delivery, 'UTF-8') === $delivery) {
+        $delivery = mb_strtolower($delivery, 'UTF-8');
+        $delivery = mb_strtoupper(mb_substr($delivery, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($delivery, 1, null, 'UTF-8');
+        $delivery = str_replace(['r$', ' full'], ['R$', ' Full'], $delivery);
+    }
     $badge = trim((string)($p['badge'] ?? ''));
     $href = product_url($p);
     ?>
@@ -150,7 +206,7 @@ function product_card(array $p, string $extra = ''): void
       <?php endif; ?>
     </div>
     <div class="pc-body">
-      <h3 class="pc-title"><a href="<?= e($href) ?>"><?= e($p['title']) ?></a></h3>
+      <h3 class="pc-title"><a href="<?= e($href) ?>" target="_blank" rel="sponsored nofollow noopener"><?= e($p['title']) ?></a></h3>
       <?php if (!empty($p['brand'])): ?>
         <span class="pc-brand"><?= e($p['brand']) ?><?php if (!empty($p['brand_verified'])): ?> <svg class="pc-verified" viewBox="0 0 16 16" aria-label="Loja oficial"><path d="M8 0l2 1.6 2.5-.2.7 2.4 2.2 1.3-.9 2.4.9 2.4-2.2 1.3-.7 2.4-2.5-.2L8 16l-2-1.6-2.5.2-.7-2.4L.6 10.9l.9-2.4L.6 6.1l2.2-1.3.7-2.4 2.5.2z" fill="#3483fa"/><path d="M4.8 8.2l2.1 2.1 4.3-4.4" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><?php endif; ?></span>
       <?php endif; ?>

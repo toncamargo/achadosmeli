@@ -7,6 +7,7 @@ function admin_header(string $title, string $active = ''): void
     $nav = [
         'produtos' => ['index.php', 'Produtos'],
         'buscar' => ['buscar.php', 'Buscar no ML'],
+        'coleta' => ['coleta.php', 'Coleta automática'],
         'categorias' => ['categorias.php', 'Categorias'],
         'banners' => ['banners.php', 'Banners'],
         'config' => ['configuracoes.php', 'Configurações'],

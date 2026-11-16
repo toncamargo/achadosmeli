@@ -16,5 +16,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 require __DIR__ . '/db.php';
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/MercadoLivre.php';
+require __DIR__ . '/Coletor.php';
 
 db_migrate();

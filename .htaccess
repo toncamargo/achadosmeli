@@ -3,7 +3,8 @@ Options -Indexes
 # Bloqueia acesso web a código interno, banco e configuração
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^(src|data|cron)(/|$) - [F,L]
+  RewriteRule ^ads\.txt$ ads.php [L]
+  RewriteRule ^(src|data|cron|agente|\.claude)(/|$) - [F,L]
   RewriteRule ^config\.php$ - [F,L]
   RewriteRule (^|/)\.env - [F,L]
   RewriteRule \.(sqlite|sqlite-wal|sqlite-shm|md)$ - [F,L]

@@ -51,6 +51,7 @@ if ($f === 'noaff') $where[] = "(p.affiliate_url IS NULL OR p.affiliate_url = ''
 if ($f === 'inactive') $where[] = 'p.active = 0';
 if ($f === 'featured') $where[] = 'p.featured = 1';
 if ($f === 'notposted') $where[] = 'p.posted_at IS NULL';
+if ($f === 'review') $where[] = 'p.active = 0 AND p.source_id IS NOT NULL';
 $sqlWhere = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
 $st = $pdo->prepare("SELECT p.*, c.name AS cat_name FROM products p LEFT JOIN categories c ON c.id = p.category_id
@@ -62,13 +63,15 @@ $stats = $pdo->query("SELECT COUNT(*) total, COALESCE(SUM(clicks),0) clicks,
     SUM(CASE WHEN affiliate_url IS NULL OR affiliate_url = '' THEN 1 ELSE 0 END) noaff,
     SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) active FROM products")->fetch();
 
+$autoAff = setting('aff_matt_word') && setting('aff_matt_tool');
+
 admin_header('Produtos', 'produtos');
 ?>
 <div class="stats">
   <div><b><?= (int)$stats['total'] ?></b><span>produtos</span></div>
   <div><b><?= (int)$stats['active'] ?></b><span>ativos no site</span></div>
   <div><b><?= (int)$stats['clicks'] ?></b><span>cliques enviados ao ML</span></div>
-  <div class="<?= $stats['noaff'] ? 'warn' : '' ?>"><b><?= (int)$stats['noaff'] ?></b><span>sem link de afiliado</span></div>
+  <div class="<?= $stats['noaff'] && !$autoAff ? 'warn' : '' ?>"><b><?= (int)$stats['noaff'] ?></b><span><?= $autoAff ? 'com link de afiliado automático' : 'sem link de afiliado' ?></span></div>
 </div>
 
 <form class="filters" method="get">
@@ -86,6 +89,7 @@ admin_header('Produtos', 'produtos');
     <option value="featured" <?= $f === 'featured' ? 'selected' : '' ?>>Em destaque</option>
     <option value="inactive" <?= $f === 'inactive' ? 'selected' : '' ?>>Inativos</option>
     <option value="notposted" <?= $f === 'notposted' ? 'selected' : '' ?>>Ainda não divulgados</option>
+    <option value="review" <?= $f === 'review' ? 'selected' : '' ?>>Coletados aguardando revisão</option>
   </select>
   <button class="btn">Filtrar</button>
   <a class="btn btn-primary" href="buscar.php">+ Adicionar produtos</a>
@@ -128,7 +132,7 @@ admin_header('Produtos', 'produtos');
         <td><?= e($p['cat_name'] ?? '—') ?></td>
         <td><?= (int)$p['clicks'] ?></td>
         <td class="small">
-          <?php if (!$p['affiliate_url']): ?><em class="tag tag-warn">sem link afiliado</em><?php endif; ?>
+          <?php if (!$p['affiliate_url']): ?><em class="tag <?= $autoAff ? '' : 'tag-warn' ?>"><?= $autoAff ? 'link automático' : 'sem link afiliado' ?></em><?php endif; ?>
           <?php if ($p['featured']): ?><em class="tag">destaque</em><?php endif; ?>
           <?php if (!$p['active']): ?><em class="tag tag-dark">inativo</em><?php endif; ?>
           <?php if ($p['posted_at']): ?><em class="tag tag-ok">divulgado</em><?php endif; ?>

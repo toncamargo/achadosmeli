@@ -68,6 +68,41 @@ CREATE TABLE IF NOT EXISTS banners (
   created_at VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Coleta automática: fontes (palavra-chave ou mais vendidos de uma categoria do ML) e histórico
+CREATE TABLE IF NOT EXISTS ml_sources (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(255) NOT NULL DEFAULT 'keyword',
+  query VARCHAR(255) NULL,
+  ml_category_id VARCHAR(255) NULL,
+  category_id INT NULL,
+  min_discount INT NOT NULL DEFAULT 0,
+  min_price DECIMAL(12,2) NULL,
+  max_price DECIMAL(12,2) NULL,
+  free_shipping_only INT NOT NULL DEFAULT 0,
+  full_only INT NOT NULL DEFAULT 0,
+  exclude_words TEXT NULL,
+  max_items INT NOT NULL DEFAULT 20,
+  auto_publish INT NOT NULL DEFAULT 0,
+  every_hours INT NOT NULL DEFAULT 12,
+  active INT NOT NULL DEFAULT 1,
+  last_run_at VARCHAR(255) NULL,
+  last_status VARCHAR(255) NULL,
+  created_at VARCHAR(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS ml_collect_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  source_id INT NULL,
+  started_at VARCHAR(255) NOT NULL,
+  finished_at VARCHAR(255) NULL,
+  found INT NOT NULL DEFAULT 0,
+  created INT NOT NULL DEFAULT 0,
+  updated INT NOT NULL DEFAULT 0,
+  skipped INT NOT NULL DEFAULT 0,
+  errors TEXT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Categorias
 INSERT IGNORE INTO categories (name, slug, sort_order) VALUES ('Casa e Cozinha', 'casa-e-cozinha', 0);
 INSERT IGNORE INTO categories (name, slug, sort_order) VALUES ('Tecnologia', 'tecnologia', 1);

@@ -1,0 +1,16 @@
+{
+  "_comentario": "Categorias do site (id/slug da tabela categories) e o termo pesquisado no Mercado Livre. Ajuste o termo se a busca trouxer produtos fora do assunto.",
+  "por_categoria": 5,
+  "categorias": [
+    { "id": 1,  "slug": "casa-e-cozinha",         "termo": "cozinha" },
+    { "id": 2,  "slug": "tecnologia",             "termo": "eletronicos" },
+    { "id": 3,  "slug": "moda",                   "termo": "roupas" },
+    { "id": 4,  "slug": "beleza",                 "termo": "beleza" },
+    { "id": 5,  "slug": "esporte",                "termo": "esporte" },
+    { "id": 6,  "slug": "games",                  "termo": "games" },
+    { "id": 7,  "slug": "bebes-e-criancas",       "termo": "bebes" , "obs": "busca vira /bebe-e; Oferta do dia traz ~3, completa com Oferta relâmpago" },
+    { "id": 8,  "slug": "ferramentas",            "termo": "ferramentas" },
+    { "id": 9,  "slug": "pet",                    "termo": "pet shop" },
+    { "id": 10, "slug": "acessorios-automotivos", "termo": "acessorios automotivos", "obs": "sem filtro de promoção: o agente entra na subcategoria Limpeza Automotiva" }
+  ]
+}
