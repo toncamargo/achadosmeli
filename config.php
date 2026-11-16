@@ -1,30 +1,33 @@
 <?php
 /**
- * Configuração principal do site.
- * A maior parte das opções (nome do site, credenciais do app Mercado Livre,
- * parâmetros de afiliado) é editada pelo painel em /admin/configuracoes.php.
- * Aqui ficam só as coisas de infraestrutura.
+ * Configuração de infraestrutura — os valores vêm do arquivo .env na raiz do projeto.
+ * Não coloque senhas aqui: edite o .env (use o .env.example como modelo).
+ *
+ * As demais opções (nome do site, app do Mercado Livre, links de afiliado)
+ * são editadas pelo painel em /admin/configuracoes.php.
  */
-return [
-    // URL pública do site, SEM barra no final. Ex.: https://achados.seudominio.com.br
-    // Deixe vazio para detectar automaticamente.
-    'base_url' => '',
+require_once __DIR__ . '/src/env.php';
+load_env(__DIR__ . '/.env');
 
-    // Banco de dados: 'sqlite' (zero configuração) ou 'mysql'
-    'db_driver' => 'sqlite',
-    'sqlite_path' => __DIR__ . '/data/achados.sqlite',
+return [
+    'base_url' => (string)env('APP_URL', ''),
+    'timezone' => (string)env('APP_TIMEZONE', 'America/Sao_Paulo'),
+    'per_page' => (int)env('APP_PER_PAGE', 24),
+    'debug'    => (bool)env('APP_DEBUG', false),
+
+    // 'sqlite' ou 'mysql'
+    'db_driver' => strtolower((string)env('DB_DRIVER', 'sqlite')),
+
+    'sqlite_path' => (function () {
+        $p = (string)env('DB_SQLITE_PATH', 'data/achados.sqlite');
+        return str_starts_with($p, '/') ? $p : __DIR__ . '/' . $p;
+    })(),
 
     'mysql' => [
-        'host' => 'localhost',
-        'port' => 3306,
-        'database' => 'achados',
-        'user' => 'root',
-        'password' => '',
+        'host'     => (string)env('DB_HOST', '127.0.0.1'),
+        'port'     => (int)env('DB_PORT', 3306),
+        'database' => (string)env('DB_DATABASE', 'achadosmeli'),
+        'user'     => (string)env('DB_USERNAME', 'root'),
+        'password' => (string)env('DB_PASSWORD', ''),
     ],
-
-    // Fuso horário do site
-    'timezone' => 'America/Sao_Paulo',
-
-    // Produtos por página na home
-    'per_page' => 24,
 ];

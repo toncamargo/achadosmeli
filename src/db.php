@@ -9,8 +9,21 @@ function db(): PDO
 
     if (($CONFIG['db_driver'] ?? 'sqlite') === 'mysql') {
         $m = $CONFIG['mysql'];
-        $dsn = "mysql:host={$m['host']};port={$m['port']};dbname={$m['database']};charset=utf8mb4";
-        $pdo = new PDO($dsn, $m['user'], $m['password']);
+        $opts = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 5];
+        $server = "mysql:host={$m['host']};port={$m['port']};charset=utf8mb4";
+        try {
+            $pdo = new PDO("$server;dbname={$m['database']}", $m['user'], $m['password'], $opts);
+        } catch (PDOException $ex) {
+            // 1049 = banco não existe: tenta criar (funciona se o usuário tiver permissão)
+            if (($ex->errorInfo[1] ?? null) !== 1049 && !str_contains($ex->getMessage(), '[1049]')) db_fail($ex);
+            try {
+                $tmp = new PDO($server, $m['user'], $m['password'], $opts);
+                $tmp->exec('CREATE DATABASE IF NOT EXISTS `' . str_replace('`', '', $m['database']) . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+                $pdo = new PDO("$server;dbname={$m['database']}", $m['user'], $m['password'], $opts);
+            } catch (PDOException $ex2) {
+                db_fail($ex2);
+            }
+        }
     } else {
         $path = $CONFIG['sqlite_path'];
         if (!is_dir(dirname($path))) mkdir(dirname($path), 0775, true);
@@ -21,6 +34,26 @@ function db(): PDO
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     return $pdo;
+}
+
+/** Página de erro amigável quando o banco não conecta. */
+function db_fail(Throwable $ex): never
+{
+    global $CONFIG;
+    error_log('[achadosmeli] Falha no banco: ' . $ex->getMessage());
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, 'Erro de banco: ' . $ex->getMessage() . "\n");
+        exit(1);
+    }
+    http_response_code(500);
+    $detail = !empty($CONFIG['debug'])
+        ? '<pre style="white-space:pre-wrap;background:#f4f4f4;padding:12px;border-radius:6px">' . htmlspecialchars($ex->getMessage()) . '</pre>'
+        : '';
+    exit('<!doctype html><meta charset="utf-8"><title>Erro de banco</title>
+      <div style="font:15px system-ui;max-width:560px;margin:60px auto;padding:0 20px">
+      <h1 style="font-size:22px">Não foi possível conectar ao banco de dados</h1>
+      <p>Confira os dados <code>DB_*</code> no arquivo <code>.env</code> na raiz do projeto
+      (host, porta, nome do banco, usuário e senha).</p>' . $detail . '</div>');
 }
 
 function db_is_mysql(): bool

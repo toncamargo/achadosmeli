@@ -20,12 +20,29 @@ Abra http://localhost:8080/admin/ → crie a senha do painel.
 > Para testar a API no seu computador, use um túnel (ex.: `ngrok http 8080`) e coloque
 > a URL do ngrok em `base_url` no `config.php`.
 
+## Configuração (.env)
+Os dados do banco e da aplicação ficam no arquivo **`.env`** na raiz (modelo em `.env.example`):
+
+| Variável | Para que serve |
+|---|---|
+| `APP_URL` | URL pública, sem barra final (ex.: `https://achadosmeli.com.br`). Vazio = detecta sozinho |
+| `APP_DEBUG` | `true` mostra o erro técnico na tela. Use `false` em produção |
+| `DB_DRIVER` | `mysql` ou `sqlite` |
+| `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` | Acesso ao MySQL/MariaDB |
+| `DB_SQLITE_PATH` | Arquivo do SQLite (quando `DB_DRIVER=sqlite`) |
+
+- As tabelas são criadas automaticamente no primeiro acesso. Se o banco ainda não existir e o usuário
+  tiver permissão, ele também é criado (`utf8mb4`).
+- Se o banco não conectar, o site mostra uma página pedindo para conferir o `.env`.
+- Variáveis definidas no painel da hospedagem têm prioridade sobre o arquivo.
+- O `.env` está no `.gitignore` e bloqueado no `.htaccess` (Apache). **Em Nginx**, bloqueie também:
+  `location ~ /\.env { deny all; }`
+
 ## Colocar no ar
 1. Suba a pasta inteira para a raiz (ou subpasta) do seu domínio.
-2. Garanta que a pasta `data/` tenha permissão de escrita (o SQLite é criado lá sozinho).
-3. Se preferir MySQL, edite `config.php` (`db_driver => 'mysql'` + dados de acesso). As tabelas são criadas automaticamente.
-4. Em `config.php`, preencha `base_url` com o endereço final (ex.: `https://achados.seudominio.com.br`).
-5. Acesse `/admin/`, crie a senha e vá em **Configurações**.
+2. Crie o banco MySQL no painel da hospedagem e preencha o `.env` (`APP_URL`, `DB_*`, `APP_DEBUG=false`).
+3. Se for usar SQLite, garanta que a pasta `data/` tenha permissão de escrita.
+4. Acesse `/admin/`, crie a senha e vá em **Configurações**.
 
 ## Conectar a API do Mercado Livre
 Desde 2025 a API do ML exige token de acesso até para buscar produtos.

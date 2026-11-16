@@ -5,5 +5,11 @@ Options -Indexes
   RewriteEngine On
   RewriteRule ^(src|data|cron)(/|$) - [F,L]
   RewriteRule ^config\.php$ - [F,L]
+  RewriteRule (^|/)\.env - [F,L]
   RewriteRule \.(sqlite|sqlite-wal|sqlite-shm|md)$ - [F,L]
 </IfModule>
+
+# Proteção extra do .env mesmo sem mod_rewrite
+<FilesMatch "^\.env">
+  Require all denied
+</FilesMatch>
