@@ -13,6 +13,7 @@ const AD_SLOTS = [
     'ad_slot_trio_1'  => ['Painel com 3 cards — 1º', '≈ 360×250'],
     'ad_slot_trio_2'  => ['Painel com 3 cards — 2º', '≈ 360×250'],
     'ad_slot_trio_3'  => ['Painel com 3 cards — 3º', '≈ 360×250'],
+    'ad_slot_topo'    => ['Topo do site, à direita da busca', '320×50 fixo — "Banner para celular"'],
 ];
 
 function adsense_client(): ?string
@@ -95,4 +96,28 @@ function ad_section_trio(): void
     $title = setting('ads_trio_title', 'Recomendados para você');
     echo '<section class="panel ads-trio"><div class="panel-head"><h2>' . e($title) . '</h2></div>'
         . '<div class="ads-trio-row">' . implode('', $units) . '</div></section>';
+}
+
+/**
+ * Anúncio do topo, à direita da busca: bloco de tamanho FIXO 320×50 (no AdSense: Anúncio display › Fixo › 320×50).
+ * Fica onde era o selo "Achados conferidos todo dia". Some em telas menores que 900px.
+ */
+function ad_header(): string
+{
+    $client = adsense_client();
+    $slot = trim((string)setting('ad_slot_topo'));
+    if ($client && preg_match('/^\d{6,20}$/', $slot)) {
+        return '<ins class="adsbygoogle" style="display:inline-block;width:320px;height:50px" data-ad-client="' . e($client)
+            . '" data-ad-slot="' . e($slot) . '"></ins>'
+            // só pede o anúncio quando o espaço está visível (evita erro do AdSense em tela pequena)
+            . '<script>if (window.matchMedia("(min-width:900px)").matches) (adsbygoogle = window.adsbygoogle || []).push({});</script>';
+    }
+    if (ads_demo()) {
+        return '<img src="' . e(url('assets/ads-teste/topo.svg')) . '" width="320" height="50" alt="Banner de teste">';
+    }
+    if (ads_preview()) {
+        return '<a class="top-ad-empty" href="' . e(url('admin/configuracoes.php#adsense')) . '">Anúncio Google 320×50'
+            . '<small>configure em Admin › Configurações (só você vê)</small></a>';
+    }
+    return '';
 }

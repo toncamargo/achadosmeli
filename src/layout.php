@@ -70,11 +70,7 @@ function site_header(array $meta = []): void
       <input name="q" value="<?= e($q) ?>" autocomplete="off" placeholder="Buscar produtos, marcas e muito mais…" aria-label="Buscar">
       <button aria-label="Buscar"><?= icon('search') ?></button>
     </form>
-    <?php if ($wa = setting('whatsapp_group')): ?>
-      <a class="promo-pill" href="<?= e($wa) ?>" target="_blank" rel="noopener"><b>Grupo VIP</b> ofertas no WhatsApp</a>
-    <?php else: ?>
-      <span class="promo-pill"><b>Achados</b> conferidos todo dia</span>
-    <?php endif; ?>
+    <div class="top-ad"><?= ad_header() ?></div>
   </div>
   <div class="wrap nav-row">
     <span class="nav-hint">Site independente<br><b>afiliado Mercado Livre</b></span>

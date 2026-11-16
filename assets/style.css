@@ -16,14 +16,23 @@ h1,h2,h3{letter-spacing:-.01em}
 
 /* ---------- cabeçalho ---------- */
 .top{background:var(--brand);position:relative;z-index:20}
-.top-row{display:flex;align-items:center;gap:28px;padding-top:8px}
+.top-row{display:flex;align-items:center;gap:32px;padding-top:8px}
+.brand{flex:none;width:144px}
+.top .wrap{padding:0 10px} /* mesma margem lateral do topo do Mercado Livre */
+/* Espaço do anúncio do topo (onde ficava o selo): bloco fixo 320×50 do AdSense */
+.top-ad{margin-left:auto;flex:none;width:320px;height:50px;display:flex;align-items:center;justify-content:flex-end}
+.top-ad:empty{width:0}
+.top-ad img{display:block;width:320px;height:50px;border-radius:4px}
+.top-ad-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;width:320px;height:50px;border:1px dashed rgba(50,52,109,.45);border-radius:4px;background:rgba(255,255,255,.35);color:var(--navy);font-size:12px;font-weight:600;text-decoration:none;line-height:1.25}
+.top-ad-empty small{font-weight:400;font-size:10px;opacity:.75}
+@media (max-width:899px){.top-ad{display:none}}
 .brand img{height:40px;width:auto}
-.search{flex:1;max-width:600px;display:flex;background:#fff;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.search{flex:0 1 588px;max-width:588px;display:flex;background:#fff;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
 .search input{flex:1;min-width:0;border:0;padding:11px 14px;font:15px Inter,sans-serif;outline:0;background:transparent}
 .search button{border:0;border-left:1px solid #e3e3e3;background:transparent;width:46px;font-size:18px;color:#666;cursor:pointer;display:grid;place-items:center;margin:8px 0}
 .promo-pill{margin-left:auto;background:var(--navy);color:#fff;text-decoration:none;padding:8px 16px;border-radius:999px;font-size:13px;white-space:nowrap}
 .promo-pill b{color:var(--brand);margin-right:4px}
-.nav-row{display:flex;align-items:center;gap:28px;height:44px;font-size:14px}
+.nav-row{display:flex;align-items:center;gap:32px;height:44px;font-size:14px}
 .nav-hint{font-size:11px;line-height:1.2;color:rgba(0,0,0,.55);flex:none;white-space:nowrap;min-width:144px}
 .nav-hint b{font-weight:500;color:rgba(0,0,0,.8);font-size:13px}
 .nav-main,.nav-side{display:flex;gap:18px;align-items:center}
@@ -240,7 +249,6 @@ h1,h2,h3{letter-spacing:-.01em}
 @media (max-width:760px){
   .top-row{flex-wrap:wrap;gap:10px;padding-bottom:8px}
   .brand img{height:32px}
-  .promo-pill{display:none}
   .search{order:3;flex-basis:100%;max-width:none}
   .nav-row{overflow-x:auto;gap:16px;height:40px;scrollbar-width:none}
   .nav-hint,.nav-side{display:none}
