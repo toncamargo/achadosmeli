@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /ir.php
+
+# Troque pelo seu domínio:
+# Sitemap: https://seudominio.com.br/sitemap.php

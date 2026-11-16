@@ -1,0 +1,9 @@
+Options -Indexes
+
+# Bloqueia acesso web a código interno, banco e configuração
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(src|data|cron)(/|$) - [F,L]
+  RewriteRule ^config\.php$ - [F,L]
+  RewriteRule \.(sqlite|sqlite-wal|sqlite-shm|md)$ - [F,L]
+</IfModule>
