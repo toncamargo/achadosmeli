@@ -100,6 +100,28 @@ logada no Chrome, pesquisa cada categoria no Mercado Livre, abre o link de ofert
 fotos (só os links) e dados de afiliado no banco. Para rodar, peça ao Claude: "rode o agente coletor-ofertas-ml".
 Detalhes em `agente/README.md`.
 
+## Instagram: responder comentários com o link (Painel → Instagram)
+Quem comenta a palavra-chave (padrão “quero”) num post cadastrado recebe o link do produto **por direct**
+(Private Reply da Meta) e uma resposta curta no comentário (“Te mandei no direct 📩”). O link passa pelo `ir.php`,
+então os cliques vindos do Instagram também são contados.
+
+- Post com 1 produto → manda ele. Vários produtos → “quero 2” manda o 2º; só “quero” manda a lista.
+- Só responde comentários feitos depois do cadastro do post, uma vez por comentário, até 7 dias (limite da Meta).
+- Conta precisa ser **profissional** (Criador ou Empresa) e **pública**.
+
+Configuração:
+1. Crie um app em developers.facebook.com, adicione **Instagram → API setup with Instagram login**.
+2. Em Admin → Instagram: cole o **Instagram app secret**, gere o token da sua conta no app da Meta e cole em “Access token”.
+3. Ligue cada post aos IDs dos produtos na própria tela.
+
+Duas formas de receber os comentários:
+- **Cron (funciona já, acesso padrão):** a cada 5 min — também renova o token (vale 60 dias)
+  ```
+  */5 * * * * php /caminho/achadosmeli/cron/instagram.php
+  ```
+- **Webhook (tempo real):** `https://SEU-DOMINIO/instagram/webhook.php` com o Verify token mostrado no painel,
+  campo `comments`. A Meta só envia com o app em modo **Live** e **Acesso Avançado** (análise do app + verificação da empresa).
+
 ## Atualizar preços automaticamente
 Configure um cron na hospedagem (a cada 3h, por exemplo):
 ```
@@ -113,17 +135,18 @@ Anúncios pausados/encerrados no ML são desativados no site. Também dá para a
 index.php            vitrine (busca, categorias, ordenação, destaques)
 produto.php          página do produto (SEO + JSON-LD)
 ir.php               redirect para o link de afiliado + contagem de cliques
+instagram/webhook.php webhook de comentários do Instagram
 sitemap.php          sitemap para o Google
 admin/               painel (produtos, buscar no ML, coleta automática, categorias, configurações)
 src/                 bootstrap, banco, helpers, cliente da API do ML, coletor, layouts
 agente/              agente coletor de ofertas via navegador (scripts, SQL, coletas)
-cron/                coleta automática (coletar.php) e atualização de preços (atualizar-precos.php)
+cron/                coleta automática (coletar.php), atualização de preços (atualizar-precos.php) e Instagram (instagram.php)
 data/                banco SQLite (bloqueado para acesso web)
 assets/style.css     estilos do site e do painel
 ```
 
 ## Próximos passos sugeridos
 - Postagem automática no Telegram (Bot API) a partir da fila "não divulgados"
-- Integração com WhatsApp/Instagram para publicar os achados
+- Integração com WhatsApp e publicação automática de posts no Instagram
 - URLs amigáveis (`/p/slug`) via `.htaccess`
 - Alertas de queda de preço usando a tabela `price_history`
