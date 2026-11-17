@@ -156,6 +156,7 @@ function site_footer(): void
         <a href="<?= e(url('?frete=1')) ?>">Frete grátis</a>
         <a href="<?= e(url('?o=populares')) ?>">Mais clicados</a>
         <a href="https://www.mercadolivre.com.br/afiliados" target="_blank" rel="noopener">Programa de Afiliados</a>
+        <a href="<?= e(url('politica-de-privacidade.php')) ?>">Política de privacidade</a>
         <?php if ($l = setting('whatsapp_group')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">WhatsApp</a><?php endif; ?>
         <?php if ($l = setting('telegram_channel')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Telegram</a><?php endif; ?>
         <?php if ($l = setting('instagram')): ?><a href="<?= e($l) ?>" target="_blank" rel="noopener">Instagram</a><?php endif; ?>

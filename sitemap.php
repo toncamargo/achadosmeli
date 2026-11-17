@@ -8,4 +8,5 @@ echo '<url><loc>' . e(url('')) . '</loc><changefreq>hourly</changefreq></url>' .
 foreach (categories() as $c) {
     echo '<url><loc>' . e(url('?c=' . $c['slug'])) . '</loc><changefreq>daily</changefreq></url>' . "\n";
 }
+echo '<url><loc>' . e(url('politica-de-privacidade.php')) . '</loc><changefreq>yearly</changefreq></url>' . "\n";
 echo '</urlset>';
