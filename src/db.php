@@ -236,6 +236,25 @@ function db_migrate(): void
         created_at $text NOT NULL
     )$engine");
 
+    // Instagram: Reels publicados pelo painel (admin/reels.php) — vídeo do agente baixar-video-ml
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_reels (
+        id $pk,
+        video $text NOT NULL,
+        caption TEXT NULL,
+        product_id INT NULL,
+        ml_id $text NULL,
+        title $text NULL,
+        share_to_feed INT NOT NULL DEFAULT 1,
+        status $text NOT NULL,
+        container_id $text NULL,
+        media_id $text NULL,
+        permalink TEXT NULL,
+        error TEXT NULL,
+        created_at $text NOT NULL,
+        updated_at $text NOT NULL,
+        published_at $text NULL
+    )$engine");
+
     // Categorias iniciais (só na primeira vez)
     $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
     if ($count === 0) {

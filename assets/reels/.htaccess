@@ -1,0 +1,10 @@
+# Vídeos dos Reels: ficam públicos só até a Meta buscar (src/Instagram.php apaga depois de publicar)
+Options -Indexes
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh|part)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  <FilesMatch "\.mp4$">
+    Header set Cache-Control "no-store"
+  </FilesMatch>
+</IfModule>

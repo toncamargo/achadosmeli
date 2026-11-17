@@ -11,6 +11,7 @@ function admin_header(string $title, string $active = '', bool $showTitle = true
         'categorias' => ['categorias.php', 'Categorias'],
         'banners' => ['banners.php', 'Banners'],
         'instagram' => ['instagram.php', 'Instagram'],
+        'reels' => ['reels.php', 'Reels'],
         'config' => ['configuracoes.php', 'Configurações'],
     ];
     $who = (string)($_SESSION['admin_name'] ?? $_SESSION['admin_email'] ?? '');

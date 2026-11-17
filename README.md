@@ -122,6 +122,23 @@ Duas formas de receber os comentários:
 - **Webhook (tempo real):** `https://SEU-DOMINIO/instagram/webhook.php` com o Verify token mostrado no painel,
   campo `comments`. A Meta só envia com o app em modo **Live** e **Acesso Avançado** (análise do app + verificação da empresa).
 
+## Instagram: publicar Reels de um produto (Painel → Reels)
+O painel `admin/reels.php` publica um Reels pela **API oficial do Instagram** (Content Publishing):
+1. O agente `agente/baixar-video-ml.md` lê o anúncio do ML e abre o painel com os dados.
+2. O vídeo é gravado no navegador (`assets/reels.js`): 1080×1920, card do produto, selo "💬 Comente QUERO" e áudio.
+3. Ao clicar em **Publicar no Instagram**, o MP4 vai em partes de 1,5 MB para `assets/reels/` (a Meta exige uma URL
+   pública). O PHP cria o contêiner `REELS`, espera o processamento e chama `media_publish`. Depois disso, apaga o MP4.
+4. O Reels fica ligado ao produto em `ig_posts`. Quem comentar "quero" recebe o link no direct.
+5. O que não terminar na hora é concluído pelo `cron/instagram.php`.
+
+Requisitos:
+- O token conectado em Admin → Instagram precisa da permissão de publicar:
+  - `instagram_content_publish`, para token `EAA…` (login do Facebook);
+  - `instagram_business_content_publish`, para token `IGAA…` (login do Instagram).
+- O botão "Testar permissão de publicar" do painel confere isso.
+- Limite da Meta: 100 publicações pela API a cada 24 h.
+- Histórico em `ig_reels`.
+
 ## Atualizar preços automaticamente
 Configure um cron na hospedagem (a cada 3h, por exemplo):
 ```

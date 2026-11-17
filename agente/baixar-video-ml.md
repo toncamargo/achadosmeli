@@ -1,53 +1,63 @@
 ---
 name: baixar-video-ml
-description: Monta um post de Instagram a partir de um anúncio do Mercado Livre, usando o Claude in Chrome. Baixa o vídeo principal em MP4 já no formato do Instagram (Reels 9:16), com um card compacto do produto (título, nota, avaliações e preço) e o selo "Comente QUERO" gravados no vídeo, baixa as fotos do produto se o usuário quiser e escreve a legenda do Instagram. Use quando pedirem para baixar o vídeo de um produto/anúncio do ML ou preparar um post/reels de um produto.
+description: Cria e publica um Reels no Instagram a partir de um anúncio do Mercado Livre, usando o Claude in Chrome e o painel do site (admin/reels.php). Grava o vídeo principal no formato do Instagram (9:16) com um card compacto do produto e o selo "Comente QUERO", escreve a legenda, publica pela API oficial do Instagram e liga o Reels ao produto para a resposta automática do "quero". Também baixa o MP4 e as fotos, se o usuário quiser. Use quando pedirem para baixar o vídeo, montar ou publicar um Reels/post de um produto do ML.
 ---
 
-Você é um agente que prepara um post de Instagram a partir de um anúncio do Mercado Livre, usando o Claude in Chrome.
+Você é o agente que transforma um anúncio do Mercado Livre em um Reels do Instagram da loja, usando o Claude in Chrome e o painel do site achadosmeli.
+
+O trabalho pesado fica no site, em PHP:
+- `admin/reels.php` grava o vídeo, recebe o MP4 e publica pela API oficial do Instagram (`src/Instagram.php`);
+- `cron/instagram.php` termina publicações que ficaram pendentes.
+
+Você só leva os dados do anúncio até o painel, escreve a legenda e aciona os botões.
 
 ## ENTRADA
-`{LINK_DO_PRODUTO}`
+`{LINK_DO_PRODUTO}`. Use só o caminho do link: tire o que vem depois de `?` ou `#`.
 
-## SAÍDA (na pasta Downloads do usuário)
-- `{slug}.mp4`: vídeo principal do anúncio **no formato do Instagram**: Reels 9:16 em 1080×1920 (padrão) ou feed 4:5 em 1080×1350, se o usuário pedir. Leva o **card do produto** embaixo e o selo **"💬 Comente QUERO"** logo acima do card.
-- `{slug}-imagens.zip`, **só se o usuário quiser as fotos**: todas as fotos do produto em tamanho grande (cerca de 1000 px), **sempre em JPG** (`{slug}-01.jpg`, `{slug}-02.jpg`…).
-- `{slug}-legenda.txt`: legenda do Instagram para anexar ao post.
+## SAÍDA
+- **O Reels publicado no Instagram** (@achadosmelicasa), com:
+  - o vídeo em 1080×1920 (9:16), com áudio;
+  - o card do produto (título, nota, avaliações e preço) acima da área que o app cobre;
+  - o selo "💬 Comente QUERO";
+  - a legenda.
+- O Reels fica **ligado ao produto do site**. Quem comentar "quero" recebe o link de afiliado no direct (automação de `admin/instagram.php`).
+- Se o usuário quiser, na pasta Downloads: `{slug}.mp4` e `{slug}-imagens.zip` (fotos em JPG).
 
 `{slug}` é o título do produto em minúsculas, sem acentos, com hífens e no máximo ~60 caracteres.
 
-## Formato do vídeo
-- Sempre sai em **1080×1920 (9:16, Reels/Stories)**. Use 1080×1350 (4:5) só se o usuário pedir post de feed, passando `formato: 'feed'`.
-- Um vídeo com proporção quase igual (até 6% de diferença) preenche a tela, cortando um pouco das bordas.
-- Um vídeo com proporção diferente (quadrado ou horizontal) entra inteiro, centralizado, sobre uma cópia dele mesmo ampliada e desfocada. Assim não fica faixa preta.
-
-## O card no vídeo
-O card e o selo são **compactos (70% do tamanho da página do ML)** para não tomar conta do vídeo. Para ajustar, use `escalaTexto`: 0.6 deixa menor e 1 deixa no tamanho original.
-
-É um popup branco com cantos arredondados, com **10px de margem nas laterais** (medidos numa tela de 360px de largura; num vídeo de 1080px isso dá 30px).
-- **No Reels, o card fica acima da área que o app cobre embaixo** (legenda, nome do perfil e barra de insights): a margem de baixo é de 110px na escala 360, ou seja, 330px no vídeo, cerca de 17% da altura. Assim o preço não fica cortado.
-- **No feed (4:5),** a margem de baixo é de 10px.
-- Para ajustar, use `margemInferior` (na escala 360px). Ele copia o bloco da página do produto:
-- o título em negrito, com no máximo 2 linhas e reticências;
-- a nota, as 5 estrelas azuis e o número de avaliações entre parênteses (ex.: `4.9 ★★★★★ (196)`);
-- o preço grande, com os centavos sobrescritos (ex.: `R$ 54⁹⁷`).
-
-Acima do card fica um selo amarelo (cor do ML) com o texto "💬 Comente QUERO".
-
 ## PASSOS
-0. **Antes de tudo, pergunte sempre ao usuário se ele quer baixar as fotos do produto junto com o vídeo** (ex.: "Quer que eu baixe as fotos do produto junto? Sim / Não"). Use a ferramenta de perguntas, se houver. Só baixe as fotos se a resposta for sim. Se não houver como perguntar, porque a execução é agendada ou o usuário não está presente, não baixe as fotos e avise na resposta.
-1. Abra o link na aba atual e espere a página carregar.
-2. Leia o arquivo `agente/scripts/video-post.js` deste repositório e cole o conteúdo **inteiro** na página com a ferramenta de JavaScript do Claude in Chrome. Isso só define a função `AGENTE_VIDEO_POST`. Na mesma chamada, rode:
-   `AGENTE_VIDEO_POST({ slug: '{slug}', fotos: true|false }); 'iniciado'`
-   O valor de `fotos` vem da resposta do passo 0. Acrescente `formato: 'feed'` só se o usuário pedir post de feed.
-   O script faz sozinho o que está descrito em "Como o script funciona" abaixo.
-3. Consulte `JSON.stringify(Object.assign({}, window.__rec, {info: undefined}))` a cada ~20 s até o `status` virar:
-   - `done`: o vídeo foi baixado, junto com as fotos se `fotos: true`;
-   - `sem-video`: o anúncio não tem vídeo. Avise e siga para a legenda. As fotos só foram baixadas se `fotos: true`;
-   - `error`: mostre `window.__rec.erro` e pare.
-   A gravação leva o tempo do vídeo mais alguns segundos.
-4. Leia os dados do produto em `window.__rec.info`: título, nota, avaliações, preço, preço original, desconto, parcelas, vendidos, destaques e descrição. Peça os campos em partes, porque a ferramenta corta respostas com mais de ~1000 caracteres.
-5. **Sempre** escreva a legenda do Instagram (regras abaixo), em toda execução, mesmo que só o vídeo tenha sido pedido. Ela faz parte da entrega e salve como `~/Downloads/{slug}-legenda.txt`. Se não der para gravar arquivo no computador, baixe pelo navegador com um Blob `text/plain` e um `<a download>`.
-6. Feche a aba se ela foi aberta por você.
+0. **Antes de começar, pergunte ao usuário** (na mesma pergunta, usando a ferramenta de perguntas se houver):
+   - "Quer que eu baixe as fotos do produto junto?" (Sim/Não);
+   - se o pedido não disse claramente para publicar ("publique", "poste", "compartilhe no Instagram"): "Publico direto no Instagram ou só deixo o vídeo e a legenda prontos para você revisar?".
+
+   Publicar é uma ação pública: só publique com o "sim" do usuário ou com o pedido explícito. Sem ninguém para responder (execução agendada), não baixe as fotos. Publique só se o pedido agendado disser para publicar.
+1. Abra o link do produto na aba e espere carregar.
+2. Leia `agente/scripts/reels-dados.js` deste repositório e cole o conteúdo **inteiro** na página com a ferramenta de JavaScript. Na mesma chamada, rode:
+   `await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com.br', slug: '{slug}', fotos: true|false, baixarMp4: false })`
+   - Ele devolve um resumo (`titulo`, `preco`, `ids`, `fotos`, `temVideo`). Logo depois, **a própria aba vai para `https://achadosmeli.com.br/admin/reels.php`**, levando os dados no nome da aba.
+   - Use `baixarMp4: true` se o usuário também quiser o arquivo, e `formato: 'feed'` só se ele pedir post de feed 4:5.
+3. No painel, confira `JSON.stringify({e: window.__reels.etapa, p: window.__reels.produto})`:
+   - Se a página for a de **login**, peça para o usuário entrar no painel nessa aba e repita o passo 2.
+   - `sem-video`: o anúncio não tem vídeo. Avise e pare. Escreva a legenda mesmo assim, se o usuário quiser um post de fotos.
+   - `produto: null`: o produto ainda não está no site. O Reels publica, mas a resposta automática do "quero" fica sem link. Avise o usuário e sugira rodar o agente coletor para esse produto.
+4. **Clique de verdade** no botão **"🎬 Gravar vídeo"** com a ferramenta de clique (`find` + `left_click`), não por JavaScript. Só com um clique real o Chrome libera o som, e o vídeo sai com áudio. Consulte `window.__reels.etapa` a cada ~20 s até virar:
+   - `gravado`: segue;
+   - `erro`: mostre `window.__reels.erro` e pare.
+
+   Leva o tempo do vídeo mais alguns segundos. `window.__reels.info.audio` diz se saiu com som.
+5. Leia `window.__reels.dados` (título, preço, preço original, desconto, parcelas, nota, avaliações, vendidos, destaques e descrição). Peça em partes, porque a ferramenta corta respostas com mais de ~1000 caracteres. Escreva a legenda (regras abaixo) e coloque no campo com `window.__reels.setLegenda(texto)`.
+6. **Publicar** (só com permissão, ver passo 0): clique em **"📤 Publicar no Instagram"**. O painel:
+   - envia o MP4 para o site em partes;
+   - cria o Reels na API do Instagram;
+   - espera o processamento e publica.
+
+   Consulte `window.__reels.etapa` a cada ~20 s até virar:
+   - `publicado`: o link do post fica em `window.__reels.reels.permalink`;
+   - `processando` por mais de 5 min: o cron termina sozinho. Avise e informe que dá para acompanhar na tabela do painel;
+   - `erro`: mostre `window.__reels.erro`. Se for falta de permissão do token, oriente a gerar um token com `instagram_content_publish` em Admin › Instagram.
+   
+   Se o usuário não quis publicar, pare no passo 5. O vídeo e a legenda ficam prontos no painel para ele revisar e clicar.
+7. Não feche a aba do painel antes de o status sair de `enviando`.
 
 ## LEGENDA DO INSTAGRAM
 Use só os dados reais do produto. Não invente características, medidas nem promessas.
@@ -60,33 +70,35 @@ Use só os dados reais do produto. Não invente características, medidas nem pr
   Se houver, inclua a prova social: nota ⭐, nº de avaliações e "+500 vendidos".
 - Um aviso: `Preço e disponibilidade podem mudar.`
 - 8 a 12 hashtags relevantes em português, numa linha no final.
-- Não coloque link na legenda, porque o link vai por comentário ou DM. No máximo 2.200 caracteres.
+- Não coloque link na legenda, porque o link vai por DM com o "quero". No máximo 2.200 caracteres.
 
-## Como o script funciona (`agente/scripts/video-post.js`)
-- **Vídeo:** procura as URLs `.m3u8` no HTML, trocando `/` e `\/` por `/`.
-  - O vídeo principal é o `.../shorts-api/videos-middleware/playlists/....m3u8`.
-  - Os `video-vod-clips/.../master.m3u8` e `preview_*.mp4` são clipes de avaliações de compradores e ficam de fora, a menos que você passe `incluirClipes: true`.
-  - Na playlist master, escolhe a variante de maior `RESOLUTION` (`index-fN-v1-a1.m3u8`).
-- **Gravação:**
-  - toca a variante num `<video>` fora da tela, com `crossOrigin='anonymous'` (o Chrome toca HLS nativamente);
-  - desenha cada quadro num `<canvas>` junto com o card;
-  - grava com `canvas.captureStream(30)` mais o áudio do vídeo, usando `MediaRecorder` em `video/mp4;codecs=avc1,mp4a.40.2` a 6 Mbps;
-  - baixa o arquivo com `<a download>`.
-- **Autoplay:** se o `play()` falhar, o script tenta de novo com `muted=true` e marca `mudo: true`. Nesse caso, avise que o áudio pode ter saído mudo.
-- **Fotos (só com `fotos: true`):** pega o ID de cada foto da galeria e baixa a versão `D_NQ_NP_2X_{id}-O.webp`. Ícones e SVG ficam de fora. Toda foto é convertida para **JPG** (qualidade 92, fundo branco) antes de entrar no zip, porque o formato entregue é sempre JPG. Junta tudo num `.zip` sem compressão, montado no próprio script.
-- **Opções:**
-  - `{ slug, fotos: false, formato: 'reels', escalaTexto: 0.7, margem: 10, margemInferior: 110, cta: 'Comente QUERO', incluirClipes: false }`.
-  - Para mudar o texto do selo, use `cta`.
+## O vídeo (feito por `assets/reels.js` no painel)
+- **Formato:** 1080×1920 (9:16). Um vídeo com proporção quase igual preenche a tela. Um quadrado ou horizontal entra inteiro, sobre uma cópia ampliada e desfocada dele mesmo.
+- **Card do produto** (70% do tamanho da página do ML, com 10px de margem nas laterais):
+  - título em até 2 linhas;
+  - nota, ★★★★★ azuis e (avaliações);
+  - preço com centavos sobrescritos;
+  - no Reels, fica 110px (na escala 360) acima da borda de baixo, fora da área que o app cobre.
+- **Selo** amarelo "💬 Comente QUERO" logo acima do card.
+- **Vídeo de origem:**
+  - É a playlist `shorts-api` do anúncio, na maior resolução.
+  - Os clipes de avaliações (`video-vod-clips`, `preview_*.mp4`) ficam de fora.
+- **Áudio:** sai junto quando a gravação começa com um clique real e não toca nos alto-falantes.
+- **Fotos** (se pedidas): galeria inteira em ~1000px, convertidas para JPG, num zip.
 
 ## RESPOSTA AO USUÁRIO
 Em 2 a 3 frases, diga:
-- os arquivos gerados;
-- a resolução, a duração e o tamanho do vídeo, e se tem áudio;
-- quantas fotos foram baixadas, se o usuário pediu as fotos.
+- o link do Reels publicado (ou que ele ficou pronto no painel para revisão);
+- a duração, se tem áudio e o produto ligado ao "quero";
+- os arquivos baixados, se houver.
 
-Depois mostre **sempre a legenda inteira** num bloco de código, pronta para copiar. Uma resposta sem a legenda está incompleta.
+Depois mostre **sempre a legenda inteira** num bloco de código. Uma resposta sem a legenda está incompleta.
 
 ## REGRAS
-- Não carregue bibliotecas externas na página e não use eval. O script do repositório é colado pela ferramenta de JavaScript.
-- Se o anúncio não tiver vídeo, diga isso, entregue a legenda (e as fotos, se ele pediu) e pare.
-- Baixe só o conteúdo do anúncio, para divulgar o próprio link de afiliado.
+- Não carregue bibliotecas externas e não use eval. Os scripts do repositório são colados pela ferramenta de JavaScript.
+- Nunca publique sem a permissão do passo 0.
+- Publique só o conteúdo do anúncio, para divulgar o próprio link de afiliado.
+- O Instagram aceita até 100 publicações pela API a cada 24 h. O botão "Testar permissão de publicar" do painel mostra o uso.
+
+## Só baixar, sem o site
+`agente/scripts/video-post.js` é a versão antiga, que roda direto na página do ML e só baixa o MP4, as fotos e nada mais. Use só se o painel estiver fora do ar. Nesse modo o vídeo sai sem som.

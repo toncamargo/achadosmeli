@@ -1,6 +1,7 @@
 <?php
 /**
- * Responde comentários do Instagram consultando os posts cadastrados e renova o token quando
+ * Responde comentários do Instagram consultando os posts cadastrados, termina a publicação dos
+ * Reels pendentes (admin/reels.php) e renova o token quando
  * faltar pouco para vencer. Funciona sem o webhook (acesso padrão da Meta). Cron a cada 5 min:
  *   *\/5 * * * *  php /caminho/para/achadosmeli/cron/instagram.php
  * Limite da Meta: 200 chamadas/hora — por isso só os 10 posts ativos mais recentes.
@@ -16,6 +17,9 @@ try {
 } catch (Throwable $ex) {
     fwrite(STDERR, date('c') . ' - ' . $ex->getMessage() . "\n");
 }
+
+// Reels enviados pelo painel que ainda estão sendo processados pela Meta
+foreach (Instagram::reelsPending() as $line) echo date('c') . " - $line\n";
 
 $r = Instagram::poll(10);
 echo date('c') . " - {$r['posts']} post(s) verificados\n";

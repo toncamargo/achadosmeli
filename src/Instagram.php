@@ -325,6 +325,140 @@ final class Instagram
         return $done('enviado', $pid);
     }
 
+    /* ==================== Publicação de Reels (admin/reels.php) ==================== */
+
+    /** Pasta pública onde o MP4 fica até a Meta buscar (a API exige um video_url público). */
+    public static function reelsDir(): string
+    {
+        $dir = __DIR__ . '/../assets/reels';
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        return $dir;
+    }
+
+    /** Uso do limite de publicação (100 posts/24 h). Também serve para testar a permissão de publicar. */
+    public static function publishingLimit(): array
+    {
+        $r = self::api('GET', setting('ig_user_id') . '/content_publishing_limit', ['fields' => 'config,quota_usage']);
+        $d = $r['data'][0] ?? [];
+        return ['usados' => (int)($d['quota_usage'] ?? 0), 'limite' => (int)($d['config']['quota_total'] ?? 100)];
+    }
+
+    /** Registra um Reels a publicar. $video = nome do arquivo em assets/reels. */
+    public static function reelSave(string $video, string $caption, ?int $productId, string $mlId, string $title, bool $shareToFeed = true): int
+    {
+        db()->prepare('INSERT INTO ig_reels (video, caption, product_id, ml_id, title, share_to_feed, status, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?)')
+            ->execute([$video, mb_substr($caption, 0, 2200), $productId ?: null, $mlId, mb_substr($title, 0, 250), $shareToFeed ? 1 : 0, 'enviado', now(), now()]);
+        return (int)db()->lastInsertId();
+    }
+
+    public static function reel(int $id): array
+    {
+        $st = db()->prepare('SELECT * FROM ig_reels WHERE id = ?');
+        $st->execute([$id]);
+        $r = $st->fetch();
+        if (!$r) throw new RuntimeException("Reels #$id não encontrado.");
+        return $r;
+    }
+
+    private static function reelUpdate(int $id, array $f): void
+    {
+        $f['updated_at'] = now();
+        $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($f)));
+        db()->prepare("UPDATE ig_reels SET $set WHERE id = ?")->execute([...array_values($f), $id]);
+    }
+
+    /**
+     * Passo 1: cria o contêiner do Reels na Meta (ela baixa o vídeo do nosso site).
+     * Passo 2 (reelCheck): quando o processamento termina, publica.
+     */
+    public static function reelStart(int $id): array
+    {
+        $r = self::reel($id);
+        if (!self::isConnected()) throw new RuntimeException('Instagram não conectado (Admin › Instagram).');
+        $file = self::reelsDir() . '/' . $r['video'];
+        if (!is_file($file)) throw new RuntimeException('Arquivo do vídeo não está mais no servidor.');
+        try {
+            $c = self::api('POST', setting('ig_user_id') . '/media', [], [
+                'media_type'    => 'REELS',
+                'video_url'     => url('assets/reels/' . rawurlencode($r['video'])),
+                'caption'       => (string)$r['caption'],
+                'share_to_feed' => (bool)$r['share_to_feed'],
+            ]);
+        } catch (Throwable $ex) {
+            self::reelUpdate($id, ['status' => 'erro', 'error' => self::friendlyError($ex->getMessage())]);
+            throw new RuntimeException(self::friendlyError($ex->getMessage()));
+        }
+        self::reelUpdate($id, ['container_id' => (string)$c['id'], 'status' => 'processando', 'error' => null]);
+        return self::reel($id);
+    }
+
+    /** Confere o processamento na Meta e publica quando estiver pronto. Seguro chamar várias vezes. */
+    public static function reelCheck(int $id): array
+    {
+        $r = self::reel($id);
+        if ($r['status'] !== 'processando' || !$r['container_id']) return $r;
+
+        $st = self::api('GET', $r['container_id'], ['fields' => 'status_code,status']);
+        $code = (string)($st['status_code'] ?? '');
+        if ($code === 'IN_PROGRESS' || $code === '') return $r;
+        if ($code === 'ERROR' || $code === 'EXPIRED') {
+            self::reelUpdate($id, ['status' => 'erro', 'error' => 'Meta recusou o vídeo: ' . ($st['status'] ?? $code)]);
+            return self::reel($id);
+        }
+        if ($code !== 'FINISHED' && $code !== 'PUBLISHED') return $r;
+
+        try {
+            $pub = self::api('POST', setting('ig_user_id') . '/media_publish', [], ['creation_id' => $r['container_id']]);
+        } catch (Throwable $ex) {
+            self::reelUpdate($id, ['status' => 'erro', 'error' => self::friendlyError($ex->getMessage())]);
+            return self::reel($id);
+        }
+        $mediaId = (string)$pub['id'];
+        $permalink = '';
+        try { $permalink = (string)(self::api('GET', $mediaId, ['fields' => 'permalink'])['permalink'] ?? ''); } catch (Throwable) {}
+
+        self::reelUpdate($id, ['status' => 'publicado', 'media_id' => $mediaId, 'permalink' => $permalink,
+            'published_at' => now(), 'error' => null]);
+
+        // Liga o Reels ao produto: quem comentar "quero" recebe o link no direct (handleComment)
+        if ($r['product_id']) {
+            self::savePost($mediaId, [(int)$r['product_id']], self::DEFAULT_KEYWORD, true, (string)$r['caption'], $permalink);
+        }
+        // A Meta já copiou o vídeo: libera espaço no servidor
+        @unlink(self::reelsDir() . '/' . $r['video']);
+        return self::reel($id);
+    }
+
+    /** Cron: termina de publicar os Reels em processamento e apaga envios parciais antigos. */
+    public static function reelsPending(): array
+    {
+        $out = [];
+        foreach (db()->query("SELECT id FROM ig_reels WHERE status = 'processando' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            try {
+                $r = self::reelCheck((int)$id);
+                $out[] = "reels #$id: {$r['status']}" . ($r['error'] ? " ({$r['error']})" : '');
+            } catch (Throwable $ex) {
+                $out[] = "reels #$id: ERRO " . $ex->getMessage();
+            }
+        }
+        foreach (glob(self::reelsDir() . '/tmp-*.part') ?: [] as $f) {
+            if (filemtime($f) < time() - 86400) @unlink($f);
+        }
+        return $out;
+    }
+
+    /** Mensagens da Meta mais comuns, explicadas. */
+    private static function friendlyError(string $msg): string
+    {
+        if (preg_match('/permission|#10|#200|not authorized|instagram_content_publish|content_publish/i', $msg)) {
+            return $msg . ' — o token não tem a permissão de publicar. Gere um token novo com '
+                . '“instagram_content_publish” (ou “instagram_business_content_publish”) e cole em Admin › Instagram.';
+        }
+        if (preg_match('/2207042|rate limit/i', $msg)) return $msg . ' — limite de 100 publicações em 24 h atingido.';
+        return $msg;
+    }
+
     /** Usado pelo cron: lê os comentários dos posts ativos mais recentes. */
     public static function poll(int $maxPosts = 10): array
     {
