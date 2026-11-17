@@ -3,7 +3,7 @@
 //
 // Como usar (Claude in Chrome, ferramenta javascript_tool, na página do produto no ML):
 //   1) cole o conteúdo deste arquivo inteiro (define window.AGENTE_REELS_DADOS);
-//   2) rode:  await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com.br', slug: '...', fotos: true|false })
+//   2) rode:  await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com', slug: '...', fotos: true|false })
 //      → devolve um resumo e, em seguida, a aba vai para {site}/admin/reels.php,
 //        que lê os dados de window.name (o nome da aba sobrevive à troca de site).
 //
@@ -97,6 +97,6 @@ window.AGENTE_REELS_DADOS = async function (opt) {
   window.name = JSON.stringify({ tipo: 'achadosmeli-reels', dados });
 
   const resumo = { titulo: titulo.slice(0, 80), preco: dados.preco, ids: dados.ml_ids, fotos: imagens.length, temVideo: !!video };
-  if (!opt.naoAbrir) setTimeout(() => { location.href = String(opt.site || 'https://achadosmeli.com.br').replace(/\/$/, '') + '/admin/reels.php'; }, 300);
+  if (!opt.naoAbrir) setTimeout(() => { location.href = String(opt.site || 'https://achadosmeli.com').replace(/\/$/, '') + '/admin/reels.php'; }, 300);
   return resumo;
 };

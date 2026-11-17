@@ -33,8 +33,8 @@ Você só leva os dados do anúncio até o painel, escreve a legenda e aciona os
    Publicar é uma ação pública: só publique com o "sim" do usuário ou com o pedido explícito. Sem ninguém para responder (execução agendada), não baixe as fotos. Publique só se o pedido agendado disser para publicar.
 1. Abra o link do produto na aba e espere carregar.
 2. Leia `agente/scripts/reels-dados.js` deste repositório e cole o conteúdo **inteiro** na página com a ferramenta de JavaScript. Na mesma chamada, rode:
-   `await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com.br', slug: '{slug}', fotos: true|false, baixarMp4: false })`
-   - Ele devolve um resumo (`titulo`, `preco`, `ids`, `fotos`, `temVideo`). Logo depois, **a própria aba vai para `https://achadosmeli.com.br/admin/reels.php`**, levando os dados no nome da aba.
+   `await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com', slug: '{slug}', fotos: true|false, baixarMp4: false })`
+   - Ele devolve um resumo (`titulo`, `preco`, `ids`, `fotos`, `temVideo`). Logo depois, **a própria aba vai para `https://achadosmeli.com/admin/reels.php`**, levando os dados no nome da aba.
    - Use `baixarMp4: true` se o usuário também quiser o arquivo, e `formato: 'feed'` só se ele pedir post de feed 4:5.
 3. No painel, confira `JSON.stringify({e: window.__reels.etapa, p: window.__reels.produto})`:
    - Se a página for a de **login**, peça para o usuário entrar no painel nessa aba e repita o passo 2.
