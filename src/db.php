@@ -207,6 +207,35 @@ function db_migrate(): void
         created_at $text NOT NULL
     )$engine");
 
+    // Instagram: posts ligados a produtos e histórico de comentários respondidos (src/Instagram.php)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_posts (
+        media_id $text PRIMARY KEY,
+        keyword $text NOT NULL DEFAULT 'quero',
+        active INT NOT NULL DEFAULT 1,
+        caption TEXT NULL,
+        permalink TEXT NULL,
+        created_at $text NOT NULL
+    )$engine");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_post_products (
+        media_id $text NOT NULL,
+        code INT NOT NULL,
+        product_id INT NOT NULL,
+        PRIMARY KEY (media_id, code)
+    )$engine");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_comment_log (
+        comment_id $text PRIMARY KEY,
+        media_id $text NULL,
+        username $text NULL,
+        text TEXT NULL,
+        product_id INT NULL,
+        source $text NULL,
+        status $text NOT NULL,
+        error TEXT NULL,
+        created_at $text NOT NULL
+    )$engine");
+
     // Categorias iniciais (só na primeira vez)
     $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
     if ($count === 0) {

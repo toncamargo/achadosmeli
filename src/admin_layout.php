@@ -10,6 +10,7 @@ function admin_header(string $title, string $active = ''): void
         'coleta' => ['coleta.php', 'Coleta automática'],
         'categorias' => ['categorias.php', 'Categorias'],
         'banners' => ['banners.php', 'Banners'],
+        'instagram' => ['instagram.php', 'Instagram'],
         'config' => ['configuracoes.php', 'Configurações'],
     ];
     ?><!doctype html>

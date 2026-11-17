@@ -48,6 +48,8 @@ vez que o site (ou `php agente/importar.php`) roda com esta versão do código.
 ## Arquivos
 ```
 coletor-ofertas-ml.md       definição do agente (instruções passo a passo)
+baixar-video-ml.md          agente que monta o post do Instagram (vídeo com card + fotos + legenda)
+scripts/video-post.js       grava o vídeo com o card do produto e baixa as fotos (usado pelo baixar-video-ml)
 categorias.json             categorias do site → termo de busca no ML (edite os termos à vontade)
 scripts/ofertas.js          busca → link de ofertas da categoria → 5 primeiros produtos
 scripts/produto.js          coleta o produto + painel Compartilhar e vai para o próximo
@@ -59,3 +61,13 @@ importar.php                JSON → banco direto, usando o .env do site
 lib.php                     regras de gravação (upsert, histórico, log)
 coletas/                    JSON de cada dia
 ```
+
+## Outro agente: post de Instagram de um anúncio
+`agente/baixar-video-ml.md` prepara um post a partir de um anúncio do ML, tudo no próprio Chrome (sem script externo):
+- `{slug}.mp4`: vídeo principal com o card do produto (título, nota, preço) embaixo e o selo "💬 Comente QUERO";
+- `{slug}-imagens.zip`: todas as fotos (~1000 px), sempre em JPG;
+- `{slug}-legenda.txt`: legenda do Instagram com "💬 Comente QUERO para receber o link".
+
+Os arquivos vão para a pasta Downloads. Para registrar: `cp agente/baixar-video-ml.md .claude/agents/`
+
+> rode o agente baixar-video-ml com https://www.mercadolivre.com.br/...

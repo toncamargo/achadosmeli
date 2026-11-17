@@ -17,5 +17,6 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/helpers.php';
 require __DIR__ . '/MercadoLivre.php';
 require __DIR__ . '/Coletor.php';
+require __DIR__ . '/Instagram.php';
 
 db_migrate();
