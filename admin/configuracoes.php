@@ -77,16 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         setting_set('ads_trio_title', trim((string)($_POST['ads_trio_title'] ?? '')));
         flash('Anúncios do Google salvos.');
-    } elseif ($action === 'password') {
-        $p = (string)$_POST['new_password'];
-        if (!password_verify((string)$_POST['current_password'], (string)setting('admin_password_hash'))) {
-            flash('Senha atual incorreta.', 'err');
-        } elseif (mb_strlen($p) < 8) {
-            flash('A nova senha precisa ter 8+ caracteres.', 'err');
-        } else {
-            setting_set('admin_password_hash', password_hash($p, PASSWORD_DEFAULT));
-            flash('Senha alterada.');
-        }
     }
     redirect(url('admin/configuracoes.php'));
 }
@@ -170,12 +160,12 @@ admin_header('Configurações', 'config');
   <button class="btn btn-primary">Salvar anúncios</button>
 </form>
 
-<form method="post" class="card">
-  <?= csrf_field() ?><input type="hidden" name="action" value="password">
-  <h2>Trocar senha</h2>
-  <label>Senha atual <input type="password" name="current_password" required></label>
-  <label>Nova senha <input type="password" name="new_password" required></label>
-  <button class="btn">Alterar</button>
-</form>
+<?php require_once __DIR__ . '/../src/google_login.php'; ?>
+<div class="card">
+  <h2>Acesso ao painel</h2>
+  <p>O login é feito com Google. Só entram as contas listadas em <code>BRAIN_EMAILS</code> no <code>.env</code>:</p>
+  <p><?php foreach (google_allowed_emails() as $em): ?><span class="tag tag-ok"><?= e($em) ?></span> <?php endforeach; ?></p>
+  <p class="muted small">No Google Cloud, o app OAuth precisa ter este URI de redirecionamento autorizado:<br><code><?= e(google_redirect_uri()) ?></code></p>
+</div>
 </div>
 <?php admin_footer();

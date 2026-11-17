@@ -135,7 +135,10 @@ function is_admin(): bool
 
 function require_admin(): void
 {
-    if (!is_admin()) redirect(url('admin/login.php'));
+    if (is_admin()) return;
+    // guarda a página pedida para voltar a ela depois do login com Google
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') $_SESSION['admin_next'] = (string)($_SERVER['REQUEST_URI'] ?? '');
+    redirect(url('admin/login.php'));
 }
 
 /* ---------- Produtos ---------- */

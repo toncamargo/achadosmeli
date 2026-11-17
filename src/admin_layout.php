@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function admin_header(string $title, string $active = ''): void
+function admin_header(string $title, string $active = '', bool $showTitle = true): void
 {
     $site = setting('site_name', 'Achados Meli');
     $nav = [
@@ -13,36 +13,58 @@ function admin_header(string $title, string $active = ''): void
         'instagram' => ['instagram.php', 'Instagram'],
         'config' => ['configuracoes.php', 'Configurações'],
     ];
+    $who = (string)($_SESSION['admin_name'] ?? $_SESSION['admin_email'] ?? '');
+    $pic = (string)($_SESSION['admin_picture'] ?? '');
     ?><!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="theme-color" content="#ffe102">
 <title><?= e($title) ?> · Admin <?= e($site) ?></title>
 <link rel="icon" href="<?= e(url('assets/favicon.svg')) ?>" type="image/svg+xml">
 <link rel="icon" href="<?= e(url('assets/favicon.png')) ?>" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="<?= e(url('assets/apple-touch-icon.png')) ?>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= e(asset('assets/style.css')) ?>">
 </head>
 <body class="admin">
-<header class="adm-top">
-  <a class="adm-brand" href="<?= e(url('admin/')) ?>"><?= e($site) ?> <small>admin</small></a>
-  <?php if (is_admin()): ?>
-  <nav>
-    <?php foreach ($nav as $key => [$href, $label]): ?>
-      <a href="<?= e(url('admin/' . $href)) ?>" class="<?= $active === $key ? 'on' : '' ?>"><?= e($label) ?></a>
-    <?php endforeach; ?>
-    <a href="<?= e(url('')) ?>" target="_blank">Ver site ↗</a>
-    <a href="<?= e(url('admin/logout.php')) ?>">Sair</a>
-  </nav>
-  <?php endif; ?>
+<header class="top adm-head">
+  <div class="wrap top-row">
+    <a class="brand" href="<?= e(url(is_admin() ? 'admin/' : '')) ?>" aria-label="<?= e($site) ?> — painel">
+      <img src="<?= e(url('assets/logo.png')) ?>" alt="<?= e($site) ?>" width="144" height="40">
+    </a>
+    <span class="adm-badge">Painel admin</span>
+    <?php if (is_admin() && $who !== ''): ?>
+      <span class="adm-user">
+        <?php if ($pic !== ''): ?><img src="<?= e($pic) ?>" alt="" width="28" height="28" referrerpolicy="no-referrer"><?php endif; ?>
+        <span><?= e($who) ?></span>
+      </span>
+    <?php endif; ?>
+  </div>
+  <div class="wrap nav-row">
+    <span class="nav-hint">Site independente<br><b>afiliado Mercado Livre</b></span>
+    <?php if (is_admin()): ?>
+    <nav class="nav-main adm-nav">
+      <?php foreach ($nav as $key => [$href, $label]): ?>
+        <a href="<?= e(url('admin/' . $href)) ?>" class="<?= $active === $key ? 'on' : '' ?>"><?= e($label) ?></a>
+      <?php endforeach; ?>
+    </nav>
+    <nav class="nav-side">
+      <a href="<?= e(url('')) ?>" target="_blank">Ver site ↗</a>
+      <a href="<?= e(url('admin/logout.php')) ?>">Sair</a>
+    </nav>
+    <?php endif; ?>
+  </div>
 </header>
-<main class="adm-main">
+<main class="wrap adm-main">
 <?php foreach (flash() ?? [] as $f): ?>
   <div class="alert alert-<?= e($f['type']) ?>"><?= e($f['msg']) ?></div>
 <?php endforeach; ?>
-<h1><?= e($title) ?></h1>
+<?php if ($showTitle): ?><h1><?= e($title) ?></h1><?php endif; ?>
 <?php
 }
 
