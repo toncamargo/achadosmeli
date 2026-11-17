@@ -8,14 +8,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
         if ($action === 'app') {
-            if (trim((string)$_POST['ig_app_secret']) !== '') setting_set('ig_app_secret', trim((string)$_POST['ig_app_secret']));
-            flash('App secret salvo.');
+            foreach (['ig_app_secret', 'fb_app_secret'] as $k) {
+                if (trim((string)($_POST[$k] ?? '')) !== '') setting_set($k, trim((string)$_POST[$k]));
+            }
+            flash('Chaves salvas.');
         } elseif ($action === 'token') {
-            foreach (Instagram::saveToken(trim((string)$_POST['token'])) as $m) flash($m, str_starts_with($m, 'Aviso') ? 'warn' : 'ok');
+            foreach (Instagram::saveToken((string)$_POST['token'], (string)($_POST['ig_id'] ?? '')) as $m) flash($m, str_starts_with($m, 'Aviso') ? 'warn' : 'ok');
         } elseif ($action === 'refresh') {
             flash(Instagram::refreshToken(true) ?? 'Nada a renovar.');
         } elseif ($action === 'disconnect') {
-            foreach (['ig_access_token', 'ig_user_id', 'ig_username', 'ig_token_expires_at'] as $k) setting_set($k, null);
+            foreach (['ig_access_token', 'ig_user_id', 'ig_username', 'ig_token_expires_at', 'ig_page_id', 'ig_api_host'] as $k) setting_set($k, null);
             flash('Instagram desconectado.');
         } elseif ($action === 'texts') {
             setting_set('ig_public_replies', trim((string)$_POST['ig_public_replies']));
@@ -68,19 +70,21 @@ pre.ig{white-space:pre-wrap;margin:0}
 <div class="card">
   <h2>1. App da Meta</h2>
   <ol class="steps">
-    <li>Em <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">developers.facebook.com</a>, crie um app
-      e adicione o produto <b>Instagram</b> → <b>API setup with Instagram login</b>.</li>
-    <li>Copie o <b>Instagram app secret</b> (não é o app secret do Facebook) e cole abaixo.</li>
-    <li>Em <b>Configure webhooks</b>, use:<br>
+    <li>No <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener">painel da Meta</a>, abra o app ›
+      <b>Casos de uso</b> › “Gerenciar mensagens e conteúdo no Instagram” › <b>Personalizar</b>.</li>
+    <li>Em <b>Webhooks</b>, use:<br>
       Callback URL: <code id="igurl"><?= e(Instagram::webhookUrl()) ?></code>
       <button type="button" class="btn btn-sm" data-copy="#igurl">Copiar</button><br>
       Verify token: <code id="igvt"><?= e(Instagram::verifyToken()) ?></code>
       <button type="button" class="btn btn-sm" data-copy="#igvt">Copiar</button><br>
       e assine o campo <code>comments</code>.</li>
+    <li>Cole abaixo as chaves usadas para conferir a assinatura do webhook (basta a que o seu app usa; na dúvida, as duas).</li>
   </ol>
   <form method="post">
     <?= csrf_field() ?><input type="hidden" name="action" value="app">
-    <label>Instagram app secret
+    <label>App secret do app <small class="muted">(Configurações do app › Básico › Chave secreta do aplicativo)</small>
+      <input name="fb_app_secret" type="password" placeholder="<?= setting('fb_app_secret') ? '•••••••• (salvo — deixe vazio para manter)' : '' ?>"></label>
+    <label>Instagram app secret <small class="muted">(se o app tiver “API setup with Instagram login”)</small>
       <input name="ig_app_secret" type="password" placeholder="<?= setting('ig_app_secret') ? '•••••••• (salvo — deixe vazio para manter)' : '' ?>"></label>
     <button class="btn">Salvar</button>
   </form>
@@ -92,7 +96,8 @@ pre.ig{white-space:pre-wrap;margin:0}
   <h2>2. Conta do Instagram</h2>
   <?php if ($connected): ?>
     <p class="ok-text">✅ Conectado como <b>@<?= e(setting('ig_username')) ?></b>
-      <?= $exp ? '· token válido até ' . date('d/m/Y', $exp) . ' (renovado pelo cron)' : '' ?></p>
+      <?= $exp ? '· token válido até ' . date('d/m/Y', $exp) . ' (renovado pelo cron)' : '· token sem vencimento' ?>
+      <span class="muted small">(<?= e(Instagram::host() === 'facebook' ? 'graph.facebook.com' : 'graph.instagram.com') ?>)</span></p>
     <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="poll">
       <button class="btn btn-sm btn-primary">Verificar comentários agora</button></form>
     <form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="refresh">
@@ -101,11 +106,14 @@ pre.ig{white-space:pre-wrap;margin:0}
       <button class="btn btn-sm">Desconectar</button></form>
     <hr>
   <?php endif; ?>
-  <p class="muted">No app da Meta, em <b>API setup with Instagram login › Generate access tokens</b>, adicione sua conta
-    (precisa ser profissional: Criador ou Empresa) e copie o token.</p>
+  <p class="muted">No app da Meta: <b>Casos de uso</b> › “Gerenciar mensagens e conteúdo no Instagram” › <b>Personalizar</b> ›
+    <b>2. Gerar tokens de acesso</b> › <b>Gerar token</b> na linha da sua conta. Copie o token e cole aqui
+    (aceita token <code>IGAA…</code> ou <code>EAA…</code>).</p>
   <form method="post">
     <?= csrf_field() ?><input type="hidden" name="action" value="token">
-    <label>Access token <input name="token" required placeholder="IGAA..."></label>
+    <label>Access token <input name="token" required placeholder="IGAA… ou EAA…"></label>
+    <label>ID da conta do Instagram <small class="muted">(número abaixo do nome da conta, em “Gerar tokens de acesso”)</small>
+      <input name="ig_id" inputmode="numeric" value="<?= e(setting('ig_user_id')) ?>" placeholder="17841400…"></label>
     <button class="btn btn-primary"><?= $connected ? 'Trocar token' : 'Conectar' ?></button>
   </form>
 </div>

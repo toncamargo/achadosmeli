@@ -40,12 +40,19 @@ final class Instagram
         return url('instagram/webhook.php');
     }
 
-    /** Chamada à graph.instagram.com. Lança RuntimeException com a mensagem da Meta. */
-    public static function api(string $method, string $path, array $query = [], ?array $json = null, ?string $token = null): array
+    /** "instagram" (token IGAA…, graph.instagram.com) ou "facebook" (token EAA…, graph.facebook.com). */
+    public static function host(): string
+    {
+        return setting('ig_api_host', 'instagram') === 'facebook' ? 'facebook' : 'instagram';
+    }
+
+    /** Chamada à API da Meta. Lança RuntimeException com a mensagem da Meta. */
+    public static function api(string $method, string $path, array $query = [], ?array $json = null, ?string $token = null, ?string $host = null): array
     {
         $token = $token ?? setting('ig_access_token');
         if (!$token) throw new RuntimeException('Instagram não conectado (cole o token em Admin › Instagram).');
-        $url = 'https://graph.instagram.com/' . self::API_VERSION . '/' . ltrim($path, '/');
+        $host = ($host ?? self::host()) === 'facebook' ? 'graph.facebook.com' : 'graph.instagram.com';
+        $url = "https://$host/" . self::API_VERSION . '/' . ltrim($path, '/');
         if ($query) $url .= '?' . http_build_query($query);
 
         $headers = ['Authorization: Bearer ' . $token];
@@ -71,29 +78,74 @@ final class Instagram
         return $data;
     }
 
-    /** Valida e salva o token; inscreve a conta no webhook de comentários. Retorna mensagens. */
-    public static function saveToken(string $token): array
+    /**
+     * Valida e salva o token, detectando o tipo:
+     *  - IGAA… (login do Instagram)  → graph.instagram.com
+     *  - EAA…  (login unificado / Facebook) → graph.facebook.com, achando a conta do Instagram
+     *    pela Página do Facebook ligada a ela, ou pelo ID informado.
+     */
+    public static function saveToken(string $token, string $igId = ''): array
     {
-        $me = self::api('GET', 'me', ['fields' => 'user_id,username'], null, $token);
-        setting_set('ig_access_token', $token);
-        setting_set('ig_user_id', (string)$me['user_id']);
-        setting_set('ig_username', (string)$me['username']);
-        setting_set('ig_token_expires_at', (string)(time() + 60 * 86400));
-        $msgs = ['Instagram conectado: @' . $me['username'] . '.'];
-        try {
-            self::api('POST', $me['user_id'] . '/subscribed_apps', ['subscribed_fields' => 'comments']);
-            $msgs[] = 'Conta inscrita no webhook de comentários.';
-        } catch (Throwable $ex) {
-            $msgs[] = 'Aviso: não inscreveu no webhook (' . $ex->getMessage() . '). O cron funciona mesmo assim.';
+        $token = trim(preg_replace('/^Bearer\s+/i', '', trim($token)));
+        $igId = preg_replace('/\D/', '', $igId);
+        if ($token === '') throw new RuntimeException('Cole o token.');
+
+        if (!str_starts_with($token, 'EAA')) {
+            $me = self::api('GET', 'me', ['fields' => 'user_id,username'], null, $token, 'instagram');
+            self::store('instagram', $token, (string)$me['user_id'], (string)$me['username'], time() + 60 * 86400);
+            $msgs = ['Instagram conectado: @' . $me['username'] . '.'];
+            try {
+                self::api('POST', $me['user_id'] . '/subscribed_apps', ['subscribed_fields' => 'comments']);
+                $msgs[] = 'Conta inscrita no webhook de comentários.';
+            } catch (Throwable $ex) {
+                $msgs[] = 'Aviso: não inscreveu no webhook (' . $ex->getMessage() . '). O cron funciona mesmo assim.';
+            }
+            return $msgs;
         }
-        return $msgs;
+
+        // Token do Facebook: primeiro tenta pelas Páginas (dá o token da Página, usado nas mensagens)
+        $errors = [];
+        try {
+            $pages = self::api('GET', 'me/accounts', [
+                'fields' => 'id,name,access_token,instagram_business_account{id,username}', 'limit' => 100,
+            ], null, $token, 'facebook')['data'] ?? [];
+            foreach ($pages as $pg) {
+                $ig = $pg['instagram_business_account'] ?? null;
+                if (!$ig || ($igId !== '' && $ig['id'] !== $igId)) continue;
+                self::store('facebook', (string)($pg['access_token'] ?? $token), (string)$ig['id'], (string)($ig['username'] ?? ''), 0);
+                setting_set('ig_page_id', (string)$pg['id']);
+                return ['Instagram conectado: @' . ($ig['username'] ?? $ig['id']) . ' (via Página “' . $pg['name'] . '”).'];
+            }
+            $errors[] = 'nenhuma Página com conta do Instagram ligada';
+        } catch (Throwable $ex) {
+            $errors[] = $ex->getMessage();
+        }
+
+        // Token de usuário do sistema / token já da conta: usa o ID informado
+        if ($igId !== '') {
+            $ig = self::api('GET', $igId, ['fields' => 'id,username'], null, $token, 'facebook');
+            self::store('facebook', $token, (string)$ig['id'], (string)($ig['username'] ?? ''), 0);
+            return ['Instagram conectado: @' . ($ig['username'] ?? $ig['id']) . '.'];
+        }
+        throw new RuntimeException('Token do Facebook (EAA…) detectado, mas não achei a conta do Instagram (' . implode('; ', $errors)
+            . '). Preencha o campo “ID da conta do Instagram” e tente de novo.');
+    }
+
+    private static function store(string $host, string $token, string $igId, string $username, int $expiresAt): void
+    {
+        setting_set('ig_api_host', $host);
+        setting_set('ig_access_token', $token);
+        setting_set('ig_user_id', $igId);
+        setting_set('ig_username', $username);
+        setting_set('ig_token_expires_at', $expiresAt ? (string)$expiresAt : null);
+        setting_set('ig_page_id', null);
     }
 
     /** Renova o token (vale 60 dias). Só renova se faltarem menos de 15 dias, a não ser com $force. */
     public static function refreshToken(bool $force = false): ?string
     {
         $token = setting('ig_access_token');
-        if (!$token) return null;
+        if (!$token || self::host() === 'facebook') return null; // tokens do Facebook (Página/sistema) não vencem
         $exp = (int)setting('ig_token_expires_at', '0');
         if (!$force && $exp - time() > 15 * 86400) return null;
 
@@ -115,7 +167,7 @@ final class Instagram
     /** Posts recentes da conta. */
     public static function media(int $limit = 24): array
     {
-        return self::api('GET', 'me/media', [
+        return self::api('GET', (setting('ig_user_id') ?: 'me') . '/media', [
             'fields' => 'id,caption,media_type,permalink,thumbnail_url,media_url,timestamp',
             'limit' => $limit,
         ])['data'] ?? [];

@@ -22,9 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit; }
 
 // 2) Notificação (POST): confere a assinatura com o Instagram app secret
 $raw = (string)file_get_contents('php://input');
-$secret = (string)setting('ig_app_secret', '');
 $sig = (string)($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '');
-if ($secret === '' || !hash_equals('sha256=' . hash_hmac('sha256', $raw, $secret), $sig)) {
+$valid = false;
+foreach (['ig_app_secret', 'fb_app_secret'] as $k) {
+    $secret = (string)setting($k, '');
+    if ($secret !== '' && hash_equals('sha256=' . hash_hmac('sha256', $raw, $secret), $sig)) { $valid = true; break; }
+}
+if (!$valid) {
     error_log('[achadosmeli] Webhook Instagram com assinatura inválida');
     http_response_code(403);
     exit;
