@@ -64,8 +64,8 @@ coletas/                    JSON de cada dia
 
 ## Outro agente: post de Instagram de um anúncio
 `agente/baixar-video-ml.md` prepara um post a partir de um anúncio do ML, tudo no próprio Chrome (sem script externo):
-- `{slug}.mp4`: vídeo principal com o card do produto (título, nota, preço) embaixo e o selo "💬 Comente QUERO";
-- `{slug}-imagens.zip`: todas as fotos (~1000 px), sempre em JPG;
+- `{slug}.mp4`: vídeo principal no formato do Instagram (Reels 9:16, 1080×1920), com um card compacto do produto (título, nota, preço) embaixo e o selo "💬 Comente QUERO";
+- `{slug}-imagens.zip`: todas as fotos (~1000 px), sempre em JPG, só se você disser que quer (o agente sempre pergunta);
 - `{slug}-legenda.txt`: legenda do Instagram com "💬 Comente QUERO para receber o link".
 
 Os arquivos vão para a pasta Downloads. Para registrar: `cp agente/baixar-video-ml.md .claude/agents/`

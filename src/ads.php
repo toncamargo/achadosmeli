@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Espaços de anúncio do Google AdSense na home.
  * Os IDs são configurados em Admin › Configurações › Google AdSense.
- * Sem configuração, o espaço some para o visitante e aparece como "reservado" só para o admin logado.
+ * Sem configuração, o espaço some. Para ver como fica: ?ads=teste (banners de exemplo) ou ?ads=espacos (onde fica cada espaço).
  */
 const AD_SLOTS = [
     'ad_slot_duplo_1' => ['Dois banners lado a lado — esquerdo', '≈ 580×130'],
@@ -30,13 +30,17 @@ function ads_preview(): bool
 
 /**
  * Banners de teste (marcas fictícias) para ver o layout antes de configurar o AdSense.
- * Aparecem para o admin logado ou com ?ads=teste na URL; ?ads=off esconde. Somem quando o AdSense é configurado.
+ * Só aparecem com ?ads=teste na URL — para qualquer pessoa, logada ou não. Sem o parâmetro, ninguém vê.
  */
 function ads_demo(): bool
 {
-    $q = (string)($_GET['ads'] ?? '');
-    if ($q === 'off') return false;
-    return $q === 'teste' || ads_preview();
+    return ($_GET['ads'] ?? '') === 'teste';
+}
+
+/** Moldura tracejada mostrando onde fica cada espaço: só com ?ads=espacos e para o admin logado. */
+function ads_slots_preview(): bool
+{
+    return ($_GET['ads'] ?? '') === 'espacos' && ads_preview();
 }
 
 /** Script do AdSense para o <head> (só quando há ID de editor configurado). */
@@ -64,10 +68,10 @@ function ad_unit(string $key): string
                 . '<img src="' . e(url('assets/ads-teste/' . $file . '.svg')) . '" alt="Banner de teste" loading="lazy"></div>';
         }
     }
-    if (ads_preview()) {
+    if (ads_slots_preview()) {
         [$name, $size] = AD_SLOTS[$key] ?? [$key, ''];
         return '<a class="ad-box ad-empty" href="' . e(url('admin/configuracoes.php#adsense')) . '"><span>Espaço para anúncio Google'
-            . '<small>' . e($name) . ' · ' . e($size) . '<br>Configure em Admin › Configurações (só você vê este aviso)</small></span></a>';
+            . '<small>' . e($name) . ' · ' . e($size) . '<br>Configure em Admin › Configurações (só você vê este aviso, com ?ads=espacos)</small></span></a>';
     }
     return '';
 }
@@ -115,7 +119,7 @@ function ad_header(): string
     if (ads_demo()) {
         return '<img src="' . e(url('assets/ads-teste/topo.svg')) . '" width="320" height="50" alt="Banner de teste">';
     }
-    if (ads_preview()) {
+    if (ads_slots_preview()) {
         return '<a class="top-ad-empty" href="' . e(url('admin/configuracoes.php#adsense')) . '">Anúncio Google 320×50'
             . '<small>configure em Admin › Configurações (só você vê)</small></a>';
     }

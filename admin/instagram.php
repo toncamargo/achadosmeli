@@ -29,6 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Instagram::savePost((string)$_POST['media_id'], $ids, (string)$_POST['keyword'], isset($_POST['active']),
                 (string)($_POST['caption'] ?? ''), (string)($_POST['permalink'] ?? ''));
             flash($ids ? 'Post salvo com ' . count($ids) . ' produto(s).' : 'Post desligado.');
+        } elseif ($action === 'retry') {
+            // Apaga o registro do erro para o comentário ser processado de novo e já verifica
+            db()->prepare("DELETE FROM ig_comment_log WHERE comment_id = ? AND status LIKE 'erro%'")->execute([(string)$_POST['comment_id']]);
+            $r = Instagram::poll(10);
+            flash('Nova tentativa feita. ' . ($r['log'] ? implode(' · ', array_slice($r['log'], 0, 10)) : 'Nenhum comentário novo.'));
         } elseif ($action === 'poll') {
             $r = Instagram::poll(10);
             flash("Verificados {$r['posts']} post(s). " . ($r['log'] ? implode(' · ', array_slice($r['log'], 0, 10)) : 'Nenhum comentário novo.'));
@@ -180,7 +185,12 @@ pre.ig{white-space:pre-wrap;margin:0}
     <?php foreach ($log as $l): ?>
       <tr><td><?= e(date('d/m H:i', strtotime((string)$l['created_at']))) ?></td>
         <td>@<?= e($l['username']) ?></td><td><?= e($l['text']) ?></td><td><?= e((string)$l['product_id']) ?></td>
-        <td><?= e($l['status']) ?><?php if ($l['error']): ?><div class="muted small"><?= e($l['error']) ?></div><?php endif; ?></td>
+        <td><?= e($l['status']) ?><?php if ($l['error']): ?><div class="muted small"><?= e($l['error']) ?></div><?php endif; ?>
+          <?php if (str_starts_with((string)$l['status'], 'erro')): ?>
+            <form method="post" style="margin-top:4px"><?= csrf_field() ?><input type="hidden" name="action" value="retry">
+              <input type="hidden" name="comment_id" value="<?= e($l['comment_id']) ?>">
+              <button class="btn btn-sm">Tentar de novo</button></form>
+          <?php endif; ?></td>
         <td><?= e($l['source']) ?></td></tr>
     <?php endforeach; ?>
     <?php if (!$log): ?><tr><td colspan="6" class="muted">Nenhum comentário processado ainda.</td></tr><?php endif; ?>

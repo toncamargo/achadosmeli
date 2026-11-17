@@ -3,21 +3,32 @@
 //
 // Como usar (Claude in Chrome, ferramenta javascript_tool, na página do produto):
 //   1) cole o conteúdo deste arquivo inteiro (define window.AGENTE_VIDEO_POST);
-//   2) rode:  AGENTE_VIDEO_POST({ slug: 'nome-do-arquivo' }); 'ok'
+//   2) rode:  AGENTE_VIDEO_POST({ slug: 'nome-do-arquivo', fotos: true }); 'ok'
 //   3) consulte window.__rec até status = 'done' (ou 'sem-video' / 'error').
 //
 // O que faz:
 //   - lê título, nota, nº de avaliações, preço e fotos da página;
-//   - acha o vídeo principal (shorts-api), escolhe a maior resolução e grava em MP4
-//     com um card do produto embaixo (margem de 10px nas laterais e embaixo, na escala
-//     de uma tela de 360px de largura) e o selo "Comente QUERO" logo acima do card;
-//   - baixa {slug}.mp4 e {slug}-imagens.zip (todas as fotos em resolução máxima, sempre em JPG).
+//   - acha o vídeo principal (shorts-api), escolhe a maior resolução e grava em MP4 no
+//     formato do Instagram: Reels 9:16 (1080x1920, padrão) ou feed 4:5 (1080x1350).
+//     Vídeo com proporção diferente é encaixado inteiro, com o próprio vídeo desfocado no fundo;
+//   - por cima: um card compacto do produto embaixo (margem de 10px nas laterais e embaixo,
+//     na escala de uma tela de 360px de largura) e o selo "Comente QUERO" logo acima;
+//   - baixa {slug}.mp4 e, só se fotos: true, {slug}-imagens.zip (fotos grandes, sempre em JPG).
+//
+// Opções: slug, fotos (false), formato ('reels' | 'feed'), margem (10, laterais),
+//         margemInferior (110 no Reels / 10 no feed, na escala 360px), cta ('Comente QUERO'),
+//         escalaTexto (0.7 = tamanho do card/selo; 1 = tamanho da página do ML), incluirClipes (false).
 // Sem bibliotecas externas e sem eval. O zip é montado aqui mesmo (sem compressão).
 window.AGENTE_VIDEO_POST = async function (opt) {
   opt = opt || {};
   const R = (window.__rec = { status: 'iniciando' });
   const MARGEM = opt.margem == null ? 10 : opt.margem; // px numa tela de 360px de largura
   const CTA = opt.cta || 'Comente QUERO';
+  const ESCALA = opt.escalaTexto || 0.7; // card e selo menores para não cobrir o vídeo
+  const FORMATO = opt.formato === 'feed' ? { w: 1080, h: 1350 } : { w: 1080, h: 1920 };
+  // margem de baixo: no Reels o app cobre a parte de baixo (legenda, barra de insights),
+  // então o card sobe para a área segura (110px na escala 360 = 330px no vídeo, ~17% da altura).
+  const MARGEM_INF = opt.margemInferior != null ? opt.margemInferior : (opt.formato === 'feed' ? MARGEM : 110);
   const BS = String.fromCharCode(92);
   const $ = (s, el) => (el || document).querySelector(s);
   const txt = (s) => (($(s) || {}).textContent || '').replace(/\s+/g, ' ').trim();
@@ -50,7 +61,10 @@ window.AGENTE_VIDEO_POST = async function (opt) {
       cents = p[1] ? (p[1] + '0').slice(0, 2) : '';
     }
     if (cents === '00') cents = '';
-    const original = ((($('.ui-pdp-price__original-value .andes-money-amount__fraction') || {}).textContent) || '').trim();
+    const origF = txt('.ui-pdp-price__original-value .andes-money-amount__fraction');
+    const origC = txt('.ui-pdp-price__original-value .andes-money-amount__cents');
+    const original = origF ? 'R$ ' + origF + (origC ? ',' + origC : '') : '';
+    const parcelas = txt('.ui-pdp-price__subtitles'); // ex.: "12x R$6,39
     const desconto = txt('.ui-pdp-price__second-line .andes-money-amount__discount');
     const vendidos = txt('.ui-pdp-header__subtitle');
     const destaques = [...document.querySelectorAll('.ui-vpp-highlighted-specs__features-list-item, .ui-pdp-features li')]
@@ -69,7 +83,7 @@ window.AGENTE_VIDEO_POST = async function (opt) {
       imagens.push({ grande: 'https://http2.mlstatic.com/D_NQ_NP_2X_' + id + '-O.webp', original: u });
     });
 
-    R.info = { titulo, nota, avals, preco: 'R$ ' + reais + (cents ? ',' + cents : ''), original, desconto, vendidos, destaques, descricao, fotos: imagens.length };
+    R.info = { titulo, nota, avals, preco: 'R$ ' + reais + (cents ? ',' + cents : ''), original, desconto, parcelas, vendidos, destaques, descricao, fotos: imagens.length };
 
     // ---------- 2. vídeo principal ----------
     R.status = 'procurando-video';
@@ -92,10 +106,10 @@ window.AGENTE_VIDEO_POST = async function (opt) {
       variante = vs[0] ? vs[0].u : master; // master sem variantes: usa ela mesma
     }
 
-    // ---------- 3. fotos (zip) — baixadas mesmo se não houver vídeo ----------
-    R.status = 'baixando-fotos';
+    // ---------- 3. fotos (zip) — só se o usuário pediu (opt.fotos) ----------
     const arquivos = [];
-    for (let i = 0; i < imagens.length; i++) {
+    if (opt.fotos) R.status = 'baixando-fotos';
+    for (let i = 0; opt.fotos && i < imagens.length; i++) {
       let ok = false;
       for (const u of [imagens[i].grande, imagens[i].original]) {
         try {
@@ -128,8 +142,16 @@ window.AGENTE_VIDEO_POST = async function (opt) {
     document.body.appendChild(v);
     v.src = variante;
     await new Promise((ok, ko) => { v.onloadedmetadata = ok; v.onerror = () => ko(new Error('erro no video ' + (v.error && v.error.code))); });
-    const W = v.videoWidth, H = v.videoHeight;
+    const VW = v.videoWidth, VH = v.videoHeight;
+    const W = FORMATO.w, H = FORMATO.h;
+    R.original = VW + 'x' + VH;
     R.resolucao = W + 'x' + H;
+    // proporção quase igual (até 6%): preenche cortando as bordas; senão encaixa inteiro com fundo desfocado
+    const capa = Math.max(W / VW, H / VH), contem = Math.min(W / VW, H / VH);
+    const cortar = Math.abs(VW / VH - W / H) / (W / H) <= 0.06;
+    const esc = cortar ? capa : contem;
+    const dw = VW * esc, dh = VH * esc, dx = (W - dw) / 2, dy = (H - dh) / 2;
+    const bw = VW * capa, bh = VH * capa, bx = (W - bw) / 2, by = (H - bh) / 2;
     R.duracao = Math.round(v.duration * 10) / 10;
 
     try { await v.play(); } catch (e) { R.mudo = true; v.muted = true; await v.play(); }
@@ -137,14 +159,20 @@ window.AGENTE_VIDEO_POST = async function (opt) {
     v.currentTime = 0;
     await new Promise((r) => { v.onseeked = r; });
 
-    const sobreposicao = desenharCard(W, H, { titulo, nota, avals, reais, cents, MARGEM, CTA });
+    const sobreposicao = desenharCard(W, H, { titulo, nota, avals, reais, cents, MARGEM, MARGEM_INF, CTA, ESCALA });
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
     let gravando = true;
     const quadro = () => {
-      ctx.drawImage(v, 0, 0, W, H);
+      if (!cortar) {
+        ctx.save();
+        ctx.filter = 'blur(40px) brightness(0.55)';
+        ctx.drawImage(v, bx, by, bw, bh);
+        ctx.restore();
+      }
+      ctx.drawImage(v, dx, dy, dw, dh);
       ctx.drawImage(sobreposicao, 0, 0);
       if (!gravando) return;
       if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(quadro); else requestAnimationFrame(quadro);
@@ -193,9 +221,10 @@ window.AGENTE_VIDEO_POST = async function (opt) {
     c.width = W;
     c.height = H;
     const g = c.getContext('2d');
-    const s = W / 360; // escala de uma tela de celular de 360px de largura
+    const tela = W / 360; // 1px numa tela de celular de 360px de largura
+    const s = tela * d.ESCALA; // tamanho dos textos e do card
     const fonte = (peso, px) => peso + ' ' + Math.round(px * s) + 'px "Proxima Nova", -apple-system, "Helvetica Neue", Arial, sans-serif';
-    const m = d.MARGEM * s, pad = 14 * s, cardW = W - 2 * m, textoW = cardW - 2 * pad;
+    const m = d.MARGEM * tela, pad = 14 * s, cardW = W - 2 * m, textoW = cardW - 2 * pad;
 
     // título: até 2 linhas, com reticências
     g.font = fonte('600', 17);
@@ -219,7 +248,7 @@ window.AGENTE_VIDEO_POST = async function (opt) {
 
     const lh = 22 * s, notaH = d.nota ? 22 * s : 0, precoH = 40 * s;
     const cardH = pad + linhas.length * lh + 4 * s + notaH + 2 * s + precoH + pad * 0.6;
-    const x = m, y = H - m - cardH;
+    const x = m, y = H - d.MARGEM_INF * tela - cardH;
 
     // card branco com sombra
     g.save();
