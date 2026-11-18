@@ -276,6 +276,27 @@ function db_migrate(): void
         $pdo->exec('CREATE INDEX IF NOT EXISTS idx_ce_product ON click_events (product_id)');
     }
 
+    // Insights do Instagram (Instagram::syncStats): métricas de cada post e da conta por dia
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_media_stats (
+        media_id VARCHAR(64) PRIMARY KEY,
+        media_type VARCHAR(20) NULL,
+        caption TEXT NULL,
+        permalink TEXT NULL,
+        thumbnail TEXT NULL,
+        posted_at VARCHAR(19) NULL,
+        views INT NULL, reach INT NULL, likes INT NULL, comments INT NULL, shares INT NULL, saved INT NULL,
+        interactions INT NULL, follows INT NULL, profile_visits INT NULL,
+        avg_watch_ms INT NULL, total_watch_ms BIGINT NULL,
+        insights_ok INT NOT NULL DEFAULT 0,
+        updated_at VARCHAR(19) NOT NULL
+    )$engine");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS ig_account_daily (
+        day VARCHAR(10) PRIMARY KEY,
+        followers_total INT NULL,
+        reach INT NULL, views INT NULL, accounts_engaged INT NULL, interactions INT NULL, link_taps INT NULL,
+        updated_at VARCHAR(19) NOT NULL
+    )$engine");
+
     // Categorias iniciais (só na primeira vez)
     $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
     if ($count === 0) {

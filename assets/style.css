@@ -511,3 +511,10 @@ body.admin{background:var(--bg)}
 .ins-health li.bad b{color:#b42318}
 .ins-list li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding-bottom:6px}
 @media (max-width:860px){.ins-grid{grid-template-columns:1fr}.ins-stats{grid-template-columns:repeat(2,1fr)}}
+.ins-card-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ins-card-head h2{margin:0}
+.ins-card-head form{margin-left:auto;display:flex;align-items:center;gap:10px}
+.tbl-scroll{overflow-x:auto}
+.ins-ig td,.ins-ig th{white-space:nowrap}
+.ins-ig td:nth-child(2){white-space:normal;min-width:220px}
+.card .stats{margin-bottom:6px}

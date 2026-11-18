@@ -491,4 +491,106 @@ final class Instagram
         }
         return ['posts' => count($posts), 'log' => $out];
     }
+
+    /* ==================== Métricas (painel admin/insights.php) ==================== */
+
+    /** Métricas de Reels e de posts do feed (API v22+: "views" substituiu plays/impressions). */
+    private const REELS_METRICS = 'views,reach,likes,comments,shares,saved,total_interactions,ig_reels_avg_watch_time,ig_reels_video_view_total_time';
+    private const FEED_METRICS = 'views,reach,likes,comments,shares,saved,total_interactions,follows,profile_visits';
+    private const ACCOUNT_METRICS = 'reach,views,accounts_engaged,total_interactions,profile_links_taps';
+
+    /**
+     * Busca as métricas da conta e dos posts recentes e grava em ig_media_stats / ig_account_daily.
+     * A Meta limita 200 chamadas/hora: o cron chama isto no máximo a cada $everyMinutes.
+     * Precisa da permissão instagram_manage_insights (token EAA…) ou instagram_business_manage_insights (IGAA…).
+     */
+    public static function syncStats(int $maxMedia = 30, int $everyMinutes = 0): array
+    {
+        $last = (int)setting('ig_stats_synced_at', '0');
+        if ($everyMinutes > 0 && time() - $last < $everyMinutes * 60) return ['pulado' => true, 'log' => []];
+
+        $pdo = db();
+        $igId = setting('ig_user_id') ?: 'me';
+        $log = [];
+        $permError = null;
+
+        // 1) Posts recentes: contagens públicas (sempre funcionam) + insights (precisam da permissão)
+        $media = self::api('GET', "$igId/media", [
+            'fields' => 'id,caption,media_type,media_product_type,permalink,thumbnail_url,media_url,timestamp,like_count,comments_count',
+            'limit' => $maxMedia,
+        ])['data'] ?? [];
+        $up = $pdo->prepare(db_is_mysql()
+            ? 'REPLACE INTO ig_media_stats (media_id, media_type, caption, permalink, thumbnail, posted_at, views, reach, likes, comments, shares, saved,
+                interactions, follows, profile_visits, avg_watch_ms, total_watch_ms, insights_ok, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+            : 'INSERT OR REPLACE INTO ig_media_stats (media_id, media_type, caption, permalink, thumbnail, posted_at, views, reach, likes, comments, shares, saved,
+                interactions, follows, profile_visits, avg_watch_ms, total_watch_ms, insights_ok, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $ok = 0;
+        foreach ($media as $m) {
+            $type = (string)($m['media_product_type'] ?? '') === 'REELS' ? 'REELS' : (string)($m['media_type'] ?? 'IMAGE');
+            $v = [];
+            if ($permError === null) {
+                try {
+                    $res = self::api('GET', $m['id'] . '/insights', ['metric' => $type === 'REELS' ? self::REELS_METRICS : self::FEED_METRICS]);
+                    foreach ($res['data'] ?? [] as $row) $v[$row['name']] = (int)($row['values'][0]['value'] ?? $row['total_value']['value'] ?? 0);
+                    $ok++;
+                } catch (Throwable $ex) {
+                    if (preg_match('/permission|#10\b|#200\b|not authorized|manage_insights/i', $ex->getMessage())) $permError = $ex->getMessage();
+                    else $log[] = "{$m['id']}: " . $ex->getMessage(); // ex.: post muito novo ou anterior à conta profissional
+                }
+            }
+            $up->execute([
+                (string)$m['id'], $type, mb_substr((string)($m['caption'] ?? ''), 0, 500), (string)($m['permalink'] ?? ''),
+                (string)($m['thumbnail_url'] ?? $m['media_url'] ?? ''), date('Y-m-d H:i:s', strtotime((string)$m['timestamp'])),
+                $v['views'] ?? null, $v['reach'] ?? null, $v['likes'] ?? (int)($m['like_count'] ?? 0), $v['comments'] ?? (int)($m['comments_count'] ?? 0),
+                $v['shares'] ?? null, $v['saved'] ?? null, $v['total_interactions'] ?? null, $v['follows'] ?? null, $v['profile_visits'] ?? null,
+                $v['ig_reels_avg_watch_time'] ?? null, $v['ig_reels_video_view_total_time'] ?? null, $v ? 1 : 0, now(),
+            ]);
+        }
+        $log[] = count($media) . " post(s) lidos, $ok com métricas completas";
+
+        // 2) Conta: seguidores (foto do dia) + alcance/visualizações por dia dos últimos 7 dias
+        $acc = self::api('GET', $igId, ['fields' => 'followers_count,follows_count,media_count']);
+        $today = date('Y-m-d');
+        $ins = $pdo->prepare(db_is_mysql()
+            ? 'INSERT INTO ig_account_daily (day, followers_total, updated_at) VALUES (?,?,?) ON DUPLICATE KEY UPDATE followers_total = VALUES(followers_total), updated_at = VALUES(updated_at)'
+            : 'INSERT INTO ig_account_daily (day, followers_total, updated_at) VALUES (?,?,?) ON CONFLICT(day) DO UPDATE SET followers_total = excluded.followers_total, updated_at = excluded.updated_at');
+        $ins->execute([$today, (int)($acc['followers_count'] ?? 0), now()]);
+        setting_set('ig_followers', (string)(int)($acc['followers_count'] ?? 0));
+
+        if ($permError === null) {
+            $have = $pdo->query("SELECT day FROM ig_account_daily WHERE reach IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN);
+            $ensure = $pdo->prepare(db_is_mysql() ? 'INSERT IGNORE INTO ig_account_daily (day, updated_at) VALUES (?,?)' : 'INSERT OR IGNORE INTO ig_account_daily (day, updated_at) VALUES (?,?)');
+            $set = $pdo->prepare('UPDATE ig_account_daily SET reach = ?, views = ?, accounts_engaged = ?, interactions = ?, link_taps = ?, updated_at = ? WHERE day = ?');
+            for ($i = 6; $i >= 0; $i--) {
+                $day = date('Y-m-d', strtotime("-$i days"));
+                // Hoje e ontem ainda mudam: sempre atualiza. Dias anteriores só se faltarem.
+                if ($i > 1 && in_array($day, $have, true)) continue;
+                try {
+                    $res = self::api('GET', "$igId/insights", [
+                        'metric' => self::ACCOUNT_METRICS, 'period' => 'day', 'metric_type' => 'total_value',
+                        'since' => strtotime("$day 00:00:00"), 'until' => min(time(), strtotime("$day 23:59:59")),
+                    ]);
+                    $v = [];
+                    foreach ($res['data'] ?? [] as $row) $v[$row['name']] = (int)($row['total_value']['value'] ?? 0);
+                    $ensure->execute([$day, now()]);
+                    $set->execute([$v['reach'] ?? 0, $v['views'] ?? 0, $v['accounts_engaged'] ?? 0, $v['total_interactions'] ?? 0, $v['profile_links_taps'] ?? 0, now(), $day]);
+                } catch (Throwable $ex) {
+                    if (preg_match('/permission|#10\b|#200\b|not authorized|manage_insights/i', $ex->getMessage())) { $permError = $ex->getMessage(); break; }
+                    $log[] = "conta $day: " . $ex->getMessage();
+                }
+            }
+        }
+
+        setting_set('ig_stats_synced_at', (string)time());
+        setting_set('ig_stats_error', $permError ? self::insightsPermissionHelp($permError) : null);
+        if ($permError) $log[] = 'SEM PERMISSÃO DE MÉTRICAS: ' . $permError;
+        return ['pulado' => false, 'log' => $log];
+    }
+
+    private static function insightsPermissionHelp(string $msg): string
+    {
+        $perm = self::host() === 'facebook' ? 'instagram_manage_insights' : 'instagram_business_manage_insights';
+        return "A Meta não liberou as métricas ($msg). Gere um token novo incluindo a permissão “$perm” e cole em Admin › Instagram. "
+            . 'Enquanto isso, só curtidas e comentários aparecem.';
+    }
 }
