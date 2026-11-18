@@ -139,6 +139,20 @@ Requisitos:
 - Limite da Meta: 100 publicações pela API a cada 24 h.
 - Histórico em `ig_reels`.
 
+## Insights (Painel → Insights)
+Cada clique no `ir.php` grava uma linha em `click_events` (a tabela é criada sozinha no primeiro acesso):
+origem (`site`, `instagram`, `social`, `legado`…), onde o card estava (`home-grade`, `home-prateleira`,
+`home-oferta-do-dia`, `home-banner`, `categoria-grade`, `busca-grade`, `direct`), post do Instagram, aparelho e um
+visitante anônimo (hash diário, sem guardar IP). Cliques feitos logado no painel ficam marcados e não entram nos números.
+
+O painel `admin/insights.php` mostra, para hoje / 7 / 30 / 90 dias: cliques e visitantes, variação contra o período
+anterior, cliques por dia e por hora, origem, aparelho e posição no site, categorias (cliques por produto ativo e coleta
+do dia contra a meta), produtos mais clicados, funil do Instagram (comentários → links enviados → cliques), saúde do
+catálogo, quedas de preço e produtos sem clique. No topo, leituras automáticas do tipo "pico às 21h, publique às 20h".
+
+- Links com origem própria: `ir.php?id=123&src=whatsapp` (aceitos: site, instagram, social, whatsapp, telegram, tiktok, bio, email).
+- Meta diária de coleta por categoria: setting `agente_meta_dia` (padrão 5).
+
 ## Atualizar preços automaticamente
 Configure um cron na hospedagem (a cada 3h, por exemplo):
 ```

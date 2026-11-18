@@ -193,7 +193,9 @@ function product_card(array $p, string $extra = ''): void
         $delivery = str_replace(['r$', ' full'], ['R$', ' Full'], $delivery);
     }
     $badge = trim((string)($p['badge'] ?? ''));
-    $href = product_url($p);
+    // Onde o card estava (para o painel Insights): página + espaço do card
+    $slot = str_contains($extra, 'pc-deal') ? 'oferta-do-dia' : (str_contains($extra, 'in-shelf') ? 'prateleira' : 'grade');
+    $href = product_url($p, ($GLOBALS['click_page'] ?? 'home') . '-' . $slot);
     ?>
   <article class="pc <?= e($extra) ?>">
     <div class="pc-img">

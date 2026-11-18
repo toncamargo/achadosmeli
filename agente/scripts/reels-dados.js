@@ -6,6 +6,7 @@
 //   2) rode:  await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com', slug: '...', fotos: true|false })
 //      → devolve um resumo e, em seguida, a aba vai para {site}/admin/reels.php,
 //        que lê os dados de window.name (o nome da aba sobrevive à troca de site).
+//      → se o anúncio não tiver vídeo, devolve { pulado: 'sem vídeo' } e NÃO abre o painel.
 //
 // Opções: site, slug, fotos (false), baixarMp4 (false), formato ('reels' | 'feed'),
 //         incluirClipes (false), naoAbrir (false: só monta os dados, sem trocar de página).
@@ -97,6 +98,8 @@ window.AGENTE_REELS_DADOS = async function (opt) {
   window.name = JSON.stringify({ tipo: 'achadosmeli-reels', dados });
 
   const resumo = { titulo: titulo.slice(0, 80), preco: dados.preco, ids: dados.ml_ids, fotos: imagens.length, temVideo: !!video };
+  // Sem vídeo do anúncio não há Reels: o agente pula o produto (não abre o painel)
+  if (!video) { window.name = ''; resumo.pulado = 'sem vídeo'; return resumo; }
   if (!opt.naoAbrir) setTimeout(() => { location.href = String(opt.site || 'https://achadosmeli.com').replace(/\/$/, '') + '/admin/reels.php'; }, 300);
   return resumo;
 };

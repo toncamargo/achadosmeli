@@ -68,8 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                 rename($tmp, Instagram::reelsDir() . '/' . $name);
                 reels_json(['video' => $name, 'url' => url('assets/reels/' . rawurlencode($name))]);
 
-            case 'publicar': // registra e manda para a Meta
-                if (!Instagram::isConnected()) throw new RuntimeException('Instagram não conectado (Admin › Instagram).');
+            case 'publicar': // registra e manda para a Meta (ou só guarda como rascunho, com rascunho=1)
+                $rascunho = !empty($_POST['rascunho']);
+                if (!$rascunho && !Instagram::isConnected()) throw new RuntimeException('Instagram não conectado (Admin › Instagram).');
                 $video = basename((string)$_POST['video']);
                 if (!preg_match('/^[a-z0-9-]+\.mp4$/', $video) || !is_file(Instagram::reelsDir() . "/$video")) throw new RuntimeException('Vídeo não encontrado no servidor.');
                 $caption = trim((string)$_POST['legenda']);
@@ -81,14 +82,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
                     if (!$st->fetchColumn()) throw new RuntimeException("Produto #$pid não existe no site.");
                 }
                 $id = Instagram::reelSave($video, $caption, $pid ?: null, (string)($_POST['ml_id'] ?? ''), (string)($_POST['titulo'] ?? ''),
-                    !empty($_POST['share_to_feed']));
-                reels_json(['reels' => reels_public(Instagram::reelStart($id))]);
+                    !empty($_POST['share_to_feed']), $rascunho ? 'rascunho' : 'enviado');
+                reels_json(['reels' => reels_public($rascunho ? Instagram::reel($id) : Instagram::reelStart($id))]);
 
             case 'status': // acompanha o processamento e publica quando pronto
                 reels_json(['reels' => reels_public(Instagram::reelCheck((int)$_POST['id']))]);
 
-            case 'tentar': // nova tentativa de um Reels com erro (o vídeo precisa ainda estar no servidor)
-                reels_json(['reels' => reels_public(Instagram::reelStart((int)$_POST['id']))]);
+            case 'tentar': // publica um rascunho, ou tenta de novo um Reels com erro (o vídeo precisa estar no servidor)
+                $r = Instagram::reel((int)$_POST['id']);
+                if (!in_array($r['status'], ['rascunho', 'erro', 'enviado'], true)) throw new RuntimeException("Reels #{$r['id']} já está {$r['status']}.");
+                reels_json(['reels' => reels_public(Instagram::reelStart((int)$r['id']))]);
+
+            case 'excluir': // descarta um rascunho (apaga o vídeo do servidor)
+                $r = Instagram::reel((int)$_POST['id']);
+                if (!in_array($r['status'], ['rascunho', 'erro'], true)) throw new RuntimeException('Só dá para excluir rascunhos ou Reels com erro.');
+                @unlink(Instagram::reelsDir() . '/' . basename((string)$r['video']));
+                db()->prepare('DELETE FROM ig_reels WHERE id = ?')->execute([(int)$r['id']]);
+                reels_json(['ok' => true]);
         }
         reels_json(['erro' => 'Ação desconhecida.'], 400);
     } catch (Throwable $ex) {
@@ -96,7 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
     }
 }
 
-$reels = db()->query('SELECT r.*, p.title AS p_title FROM ig_reels r LEFT JOIN products p ON p.id = r.product_id ORDER BY r.id DESC LIMIT 30')->fetchAll();
+$reels = db()->query("SELECT r.*, p.title AS p_title FROM ig_reels r LEFT JOIN products p ON p.id = r.product_id
+    ORDER BY (r.status = 'rascunho') DESC, r.id DESC LIMIT 100")->fetchAll();
+$nRascunhos = count(array_filter($reels, fn($r) => $r['status'] === 'rascunho'));
 $connected = Instagram::isConnected();
 
 admin_header('Reels no Instagram', 'reels');
@@ -153,27 +165,39 @@ admin_header('Reels no Instagram', 'reels');
         <textarea id="legenda" maxlength="2200" placeholder="Escreva a legenda com “💬 Comente QUERO para receber o link”…"></textarea></label>
       <p class="muted small"><span id="contador">0</span>/2200 caracteres</p>
       <label><input type="checkbox" id="share_to_feed" checked> mostrar também no feed do perfil</label>
-      <p><button type="button" class="btn btn-primary" id="publicar" disabled>📤 Publicar no Instagram</button></p>
+      <p class="rl-row"><button type="button" class="btn btn-primary" id="publicar" disabled>📤 Publicar no Instagram</button>
+        <button type="button" class="btn" id="rascunho" disabled>💾 Salvar como rascunho</button></p>
       <div class="rl-status" id="status">Aguardando a gravação do vídeo.</div>
     </div>
   </div>
 </div>
 
 <div class="card">
-  <h2>Reels publicados por aqui</h2>
+  <h2>Reels<?php if ($nRascunhos): ?> <small class="muted">· <?= $nRascunhos ?> rascunho(s) prontos para publicar</small><?php endif; ?></h2>
+  <p class="muted small">Rascunho = vídeo e legenda prontos no servidor. Clique em “Publicar” quando quiser; a resposta do “quero” é ligada na hora.</p>
   <table class="tbl small">
     <tr><th>#</th><th>Quando</th><th>Produto</th><th>Status</th><th></th></tr>
     <?php foreach ($reels as $r): ?>
       <tr>
         <td><?= (int)$r['id'] ?></td>
         <td><?= e(date('d/m H:i', strtotime((string)$r['created_at']))) ?></td>
-        <td><?= e($r['p_title'] ? '#' . $r['product_id'] . ' ' . mb_strimwidth((string)$r['p_title'], 0, 60, '…') : ($r['title'] ?: '—')) ?></td>
+        <td><?= e($r['p_title'] ? '#' . $r['product_id'] . ' ' . mb_strimwidth((string)$r['p_title'], 0, 60, '…') : ($r['title'] ?: '—')) ?>
+          <?php if ($r['status'] === 'rascunho'): ?>
+            <details><summary class="muted">ver legenda e vídeo</summary>
+              <pre style="white-space:pre-wrap;font-family:inherit;max-width:520px"><?= e((string)$r['caption']) ?></pre>
+              <a href="<?= e(url('assets/reels/' . rawurlencode((string)$r['video']))) ?>" target="_blank" rel="noopener">abrir o vídeo ↗</a>
+            </details>
+          <?php endif; ?></td>
         <td><b><?= e($r['status']) ?></b><?php if ($r['error']): ?><div class="muted"><?= e($r['error']) ?></div><?php endif; ?></td>
         <td>
           <?php if ($r['permalink']): ?><a href="<?= e($r['permalink']) ?>" target="_blank" rel="noopener">ver no Instagram ↗</a><?php endif; ?>
           <?php if ($r['status'] === 'processando'): ?><button type="button" class="btn btn-sm" data-status="<?= (int)$r['id'] ?>">Verificar</button><?php endif; ?>
+          <?php if ($r['status'] === 'rascunho'): ?>
+            <button type="button" class="btn btn-sm btn-primary" data-tentar="<?= (int)$r['id'] ?>">📤 Publicar</button>
+            <button type="button" class="btn btn-sm" data-excluir="<?= (int)$r['id'] ?>">Excluir</button><?php endif; ?>
           <?php if ($r['status'] === 'erro' && is_file(Instagram::reelsDir() . '/' . $r['video'])): ?>
-            <button type="button" class="btn btn-sm" data-tentar="<?= (int)$r['id'] ?>">Tentar de novo</button><?php endif; ?>
+            <button type="button" class="btn btn-sm" data-tentar="<?= (int)$r['id'] ?>">Tentar de novo</button>
+            <button type="button" class="btn btn-sm" data-excluir="<?= (int)$r['id'] ?>">Excluir</button><?php endif; ?>
         </td>
       </tr>
     <?php endforeach; ?>
@@ -212,13 +236,22 @@ admin_header('Reels no Instagram', 'reels');
       $('#limite').textContent = `✅ permissão ok · ${j.limite.usados}/${j.limite.limite} publicações nas últimas 24 h`;
     } catch (e) { $('#limite').textContent = '❌ ' + e.message; }
   });
-  document.querySelectorAll('[data-status],[data-tentar]').forEach((b) => b.addEventListener('click', async () => {
+  document.querySelectorAll('[data-status],[data-tentar],[data-excluir]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.dataset.excluir && !confirm('Excluir este rascunho? O vídeo é apagado do servidor.')) return;
     b.disabled = true;
+    const txt = b.textContent;
     try {
-      const j = b.dataset.status ? await api('status', { id: b.dataset.status }) : await api('tentar', { id: b.dataset.tentar });
-      alert('Status: ' + j.reels.status + (j.reels.erro ? '\n' + j.reels.erro : ''));
+      if (b.dataset.excluir) { await api('excluir', { id: b.dataset.excluir }); location.reload(); return; }
+      let j = b.dataset.status ? await api('status', { id: b.dataset.status }) : await api('tentar', { id: b.dataset.tentar });
+      // publicação: acompanha o processamento por até ~3 min
+      for (let n = 0; n < 36 && j.reels.status === 'processando'; n++) {
+        b.textContent = `processando… ${(n + 1) * 5} s`;
+        await new Promise((r) => setTimeout(r, 5000));
+        j = await api('status', { id: j.reels.id });
+      }
+      if (j.reels.status !== 'publicado') alert('Status: ' + j.reels.status + (j.reels.erro ? '\n' + j.reels.erro : ''));
       location.reload();
-    } catch (e) { alert(e.message); b.disabled = false; }
+    } catch (e) { alert(e.message); b.disabled = false; b.textContent = txt; }
   }));
 
   // ---------- dados vindos do agente (window.name), guardados na aba ----------
@@ -252,7 +285,8 @@ admin_header('Reels no Instagram', 'reels');
 
   const atualizaBotao = () => {
     $('#contador').textContent = $('#legenda').value.length;
-    $('#publicar').disabled = !(R.video || R.blob) || !$('#legenda').value.trim() || ['enviando', 'processando', 'publicado'].includes(R.etapa);
+    $('#publicar').disabled = !(R.video || R.blob) || !$('#legenda').value.trim() || ['enviando', 'processando', 'publicado', 'rascunho'].includes(R.etapa);
+    $('#rascunho').disabled = $('#publicar').disabled;
   };
   $('#legenda').addEventListener('input', atualizaBotao);
   R.setLegenda = (t) => { $('#legenda').value = String(t); atualizaBotao(); return $('#legenda').value.length; };
@@ -303,23 +337,45 @@ admin_header('Reels no Instagram', 'reels');
     atualizaBotao();
   });
 
+  // ---------- enviar o MP4 para o site (em partes) ----------
+  async function enviarVideo() {
+    if (R.video) return;
+    const uid = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+    const PARTE = 1536 * 1024, total = Math.ceil(R.blob.size / PARTE);
+    for (let i = 0; i < total; i++) {
+      status(`enviando o vídeo para o site… ${Math.round((i / total) * 100)}%`);
+      const j = await api('chunk', { upload_id: uid, index: i, total, slug: dados.slug }, R.blob.slice(i * PARTE, (i + 1) * PARTE));
+      if (j.video) { R.video = j.video; R.videoUrl = j.url; }
+    }
+  }
+  const camposReels = () => ({ video: R.video, legenda: $('#legenda').value, produto_id: $('#produto_id').value,
+    ml_id: dados.ml_ids[0] || '', titulo: dados.titulo, share_to_feed: $('#share_to_feed').checked ? '1' : '' });
+
+  // ---------- salvar como rascunho (publica depois, pela tabela) ----------
+  $('#rascunho').addEventListener('click', async () => {
+    if (!R.blob && !R.video) return;
+    R.etapa = 'enviando'; atualizaBotao();
+    try {
+      await enviarVideo();
+      const j = await api('publicar', Object.assign(camposReels(), { rascunho: '1' }));
+      R.reels = j.reels; R.etapa = 'rascunho';
+      sessionStorage.removeItem('achadosmeli-reels');
+      status(`💾 Rascunho #${j.reels.id} salvo. Publique quando quiser na lista abaixo (recarregue a página).`, 'ok');
+    } catch (e) {
+      R.etapa = 'erro'; R.erro = e.message;
+      status('Erro ao salvar o rascunho: ' + e.message, 'err');
+    }
+    atualizaBotao();
+  });
+
   // ---------- publicar ----------
   $('#publicar').addEventListener('click', async () => {
     if (!R.blob && !R.video) return;
     R.etapa = 'enviando'; atualizaBotao();
     try {
-      if (!R.video) {
-        const uid = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
-        const PARTE = 1536 * 1024, total = Math.ceil(R.blob.size / PARTE);
-        for (let i = 0; i < total; i++) {
-          status(`enviando o vídeo para o site… ${Math.round((i / total) * 100)}%`);
-          const j = await api('chunk', { upload_id: uid, index: i, total, slug: dados.slug }, R.blob.slice(i * PARTE, (i + 1) * PARTE));
-          if (j.video) { R.video = j.video; R.videoUrl = j.url; }
-        }
-      }
+      await enviarVideo();
       status('enviando para o Instagram…');
-      let j = await api('publicar', { video: R.video, legenda: $('#legenda').value, produto_id: $('#produto_id').value,
-        ml_id: dados.ml_ids[0] || '', titulo: dados.titulo, share_to_feed: $('#share_to_feed').checked ? '1' : '' });
+      let j = await api('publicar', camposReels());
       R.reels = j.reels; R.etapa = 'processando';
       for (let n = 0; n < 60 && j.reels.status === 'processando'; n++) {
         status(`o Instagram está processando o vídeo… (${(n + 1) * 5} s)`);

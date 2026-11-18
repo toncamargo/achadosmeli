@@ -1,6 +1,6 @@
 ---
 name: baixar-video-ml
-description: Cria e publica um Reels no Instagram a partir de um anúncio do Mercado Livre, usando o Claude in Chrome e o painel do site (admin/reels.php). Grava o vídeo principal no formato do Instagram (9:16) com um card compacto do produto e o selo "Comente QUERO", escreve a legenda, publica pela API oficial do Instagram e liga o Reels ao produto para a resposta automática do "quero". Também baixa o MP4 e as fotos, se o usuário quiser. Use quando pedirem para baixar o vídeo, montar ou publicar um Reels/post de um produto do ML.
+description: Cria e publica (ou deixa como rascunho) um Reels no Instagram a partir de um anúncio do Mercado Livre — só para produtos que têm vídeo; os sem vídeo são pulados, usando o Claude in Chrome e o painel do site (admin/reels.php). Grava o vídeo principal no formato do Instagram (9:16) com um card compacto do produto e o selo "Comente QUERO", escreve a legenda, publica pela API oficial do Instagram e liga o Reels ao produto para a resposta automática do "quero". Também baixa o MP4 e as fotos, se o usuário quiser. Use quando pedirem para baixar o vídeo, montar ou publicar um Reels/post de um produto do ML.
 ---
 
 Você é o agente que transforma um anúncio do Mercado Livre em um Reels do Instagram da loja, usando o Claude in Chrome e o painel do site achadosmeli.
@@ -12,7 +12,9 @@ O trabalho pesado fica no site, em PHP:
 Você só leva os dados do anúncio até o painel, escreve a legenda e aciona os botões.
 
 ## ENTRADA
-`{LINK_DO_PRODUTO}`. Use só o caminho do link: tire o que vem depois de `?` ou `#`.
+`{LINK_DO_PRODUTO}`, uma lista de links, ou "todo o catálogo". Use só o caminho de cada link: tire o que vem depois de `?` ou `#`.
+
+**Só produtos com vídeo.** O Reels é feito com o vídeo do próprio anúncio. Se o anúncio não tiver vídeo, **pule o produto**: não grave, não publique e só liste-o no fim como "sem vídeo".
 
 ## SAÍDA
 - **O Reels publicado no Instagram** (@achadosmelicasa), com:
@@ -28,19 +30,21 @@ Você só leva os dados do anúncio até o painel, escreve a legenda e aciona os
 ## PASSOS
 0. **Antes de começar, pergunte ao usuário** (na mesma pergunta, usando a ferramenta de perguntas se houver):
    - "Quer que eu baixe as fotos do produto junto?" (Sim/Não);
-   - se o pedido não disse claramente para publicar ("publique", "poste", "compartilhe no Instagram"): "Publico direto no Instagram ou só deixo o vídeo e a legenda prontos para você revisar?".
+   - se o pedido não disse claramente para publicar ("publique", "poste", "compartilhe no Instagram"): "Publico direto no Instagram ou deixo como rascunho no painel para você publicar depois?";
+   - em lote (vários produtos ou o catálogo inteiro): quantos publicar agora e quantos deixar como **rascunho**. Publicar dezenas de Reels de uma vez parece spam e derruba o alcance.
 
    Publicar é uma ação pública: só publique com o "sim" do usuário ou com o pedido explícito. Sem ninguém para responder (execução agendada), não baixe as fotos. Publique só se o pedido agendado disser para publicar.
 1. Abra o link do produto na aba e espere carregar.
 2. Leia `agente/scripts/reels-dados.js` deste repositório e cole o conteúdo **inteiro** na página com a ferramenta de JavaScript. Na mesma chamada, rode:
    `await AGENTE_REELS_DADOS({ site: 'https://achadosmeli.com', slug: '{slug}', fotos: true|false, baixarMp4: false })`
    - Ele devolve um resumo (`titulo`, `preco`, `ids`, `fotos`, `temVideo`). Logo depois, **a própria aba vai para `https://achadosmeli.com/admin/reels.php`**, levando os dados no nome da aba.
+   - Se vier `pulado: 'sem vídeo'`, a aba **não** muda de página: anote o produto como pulado e siga para o próximo.
    - Use `baixarMp4: true` se o usuário também quiser o arquivo, e `formato: 'feed'` só se ele pedir post de feed 4:5.
 3. No painel, confira `JSON.stringify({e: window.__reels.etapa, p: window.__reels.produto})`:
    - Se a página for a de **login**, peça para o usuário entrar no painel nessa aba e repita o passo 2.
    - `sem-video`: o anúncio não tem vídeo. Avise e pare. Escreva a legenda mesmo assim, se o usuário quiser um post de fotos.
    - `produto: null`: o produto ainda não está no site. O Reels publica, mas a resposta automática do "quero" fica sem link. Avise o usuário e sugira rodar o agente coletor para esse produto.
-4. **Clique de verdade** no botão **"🎬 Gravar vídeo"** com a ferramenta de clique (`find` + `left_click`), não por JavaScript. Só com um clique real o Chrome libera o som, e o vídeo sai com áudio. Consulte `window.__reels.etapa` a cada ~20 s até virar:
+4. **Clique de verdade** no botão **"🎬 Gravar vídeo"** com a ferramenta de clique (`find` + `left_click`), não por JavaScript. Só com um clique real o Chrome libera o som, e o vídeo sai com áudio. Consulte `window.__reels.etapa` a cada ~20 s até virar. Cada consulta deve esperar no máximo ~20 s: uma espera longa dentro da ferramenta de JavaScript trava a aba e pausa o vídeo.
    - `gravado`: segue;
    - `erro`: mostre `window.__reels.erro` e pare.
 
@@ -56,8 +60,19 @@ Você só leva os dados do anúncio até o painel, escreve a legenda e aciona os
    - `processando` por mais de 5 min: o cron termina sozinho. Avise e informe que dá para acompanhar na tabela do painel;
    - `erro`: mostre `window.__reels.erro`. Se for falta de permissão do token, oriente a gerar um token com `instagram_content_publish` em Admin › Instagram.
    
-   Se o usuário não quis publicar, pare no passo 5. O vídeo e a legenda ficam prontos no painel para ele revisar e clicar.
+   **Rascunho** (quando o usuário não quis publicar agora): clique em **"💾 Salvar como rascunho"** e espere `window.__reels.etapa === 'rascunho'`. O vídeo vai para o servidor com a legenda e aparece na tabela do painel com o botão **"📤 Publicar"**. O usuário publica quando quiser, e a resposta do "quero" é ligada na hora da publicação.
 7. Não feche a aba do painel antes de o status sair de `enviando`.
+
+## EM LOTE (lista de links ou catálogo inteiro)
+- **Catálogo:** os produtos ativos do site que ainda não têm Reels:
+  `SELECT id, permalink FROM products WHERE active = 1 AND id NOT IN (SELECT product_id FROM ig_reels WHERE product_id IS NOT NULL)`.
+- **Antes de gravar, descubra quais têm vídeo**, para não perder tempo:
+  - numa aba do `www.mercadolivre.com.br`, faça `fetch` do HTML de cada link (mesma origem);
+  - procure `shorts-api/videos-middleware`;
+  - links `produto.mercadolivre.com.br` são de outra origem: abra cada um, ou só rode o passo 2.
+- **Ordem:** varie as categorias, para não publicar 5 produtos parecidos em seguida.
+- Faça um produto por vez, do passo 1 ao 6, sempre na mesma aba. Fechar abas do grupo pode desfazer o grupo do Claude in Chrome.
+- **No fim, liste:** os publicados (com links), os rascunhos salvos e os pulados por não ter vídeo.
 
 ## LEGENDA DO INSTAGRAM
 Use só os dados reais do produto. Não invente características, medidas nem promessas.
@@ -74,11 +89,11 @@ Use só os dados reais do produto. Não invente características, medidas nem pr
 
 ## O vídeo (feito por `assets/reels.js` no painel)
 - **Formato:** 1080×1920 (9:16). Um vídeo com proporção quase igual preenche a tela. Um quadrado ou horizontal entra inteiro, sobre uma cópia ampliada e desfocada dele mesmo.
-- **Card do produto** (70% do tamanho da página do ML, com 10px de margem nas laterais):
+- **Card do produto** (70% do tamanho da página do ML, com 26px de margem nas laterais na escala 360, ou 78px no vídeo, porque em tela cheia o Instagram corta as laterais em celulares mais compridos):
   - título em até 2 linhas;
   - nota, ★★★★★ azuis e (avaliações);
   - preço com centavos sobrescritos;
-  - no Reels, fica 110px (na escala 360) acima da borda de baixo, fora da área que o app cobre.
+  - no Reels, fica 80px (na escala 360, ou 240px no vídeo) acima da borda de baixo, logo acima da legenda e dos botões do app.
 - **Selo** amarelo "💬 Comente QUERO" logo acima do card.
 - **Vídeo de origem:**
   - É a playlist `shorts-api` do anúncio, na maior resolução.
@@ -88,7 +103,7 @@ Use só os dados reais do produto. Não invente características, medidas nem pr
 
 ## RESPOSTA AO USUÁRIO
 Em 2 a 3 frases, diga:
-- o link do Reels publicado (ou que ele ficou pronto no painel para revisão);
+- o link do Reels publicado (ou que ele ficou como rascunho no painel);
 - a duração, se tem áudio e o produto ligado ao "quero";
 - os arquivos baixados, se houver.
 

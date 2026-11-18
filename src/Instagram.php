@@ -206,11 +206,11 @@ final class Instagram
     }
 
     /** Link enviado no direct: passa pelo ir.php (conta o clique) quando a URL do site é conhecida. */
-    public static function productLink(array $p): string
+    public static function productLink(array $p, string $mediaId = ''): string
     {
         global $CONFIG;
         if (PHP_SAPI === 'cli' && empty($CONFIG['base_url'])) return product_destination($p);
-        return go_url($p);
+        return go_url($p, 'instagram', 'direct', $mediaId);
     }
 
     private static function normalize(string $s): string
@@ -290,13 +290,13 @@ final class Instagram
             $dm = self::fill((string)setting('ig_dm_single', self::DEFAULT_DM_SINGLE), $vars + [
                 'title' => mb_strimwidth((string)$chosen['title'], 0, 120, '…'),
                 'price' => money((float)$chosen['price']),
-                'link'  => self::productLink($chosen),
+                'link'  => self::productLink($chosen, (string)$c['media_id']),
             ]);
         } else {
             $dm = self::fill((string)setting('ig_dm_list', self::DEFAULT_DM_LIST), $vars) . "\n";
             foreach ($products as $p) {
                 $dm .= "\n{$p['code']}) " . mb_strimwidth((string)$p['title'], 0, 60, '…') . ' – ' . money((float)$p['price'])
-                     . "\n👉 " . self::productLink($p) . "\n";
+                     . "\n👉 " . self::productLink($p, (string)$c['media_id']) . "\n";
             }
         }
         $dm = mb_substr($dm, 0, 1000);
@@ -344,11 +344,12 @@ final class Instagram
     }
 
     /** Registra um Reels a publicar. $video = nome do arquivo em assets/reels. */
-    public static function reelSave(string $video, string $caption, ?int $productId, string $mlId, string $title, bool $shareToFeed = true): int
+    /** $status = 'enviado' (publica em seguida) ou 'rascunho' (fica no painel até alguém clicar em Publicar). */
+    public static function reelSave(string $video, string $caption, ?int $productId, string $mlId, string $title, bool $shareToFeed = true, string $status = 'enviado'): int
     {
         db()->prepare('INSERT INTO ig_reels (video, caption, product_id, ml_id, title, share_to_feed, status, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?)')
-            ->execute([$video, mb_substr($caption, 0, 2200), $productId ?: null, $mlId, mb_substr($title, 0, 250), $shareToFeed ? 1 : 0, 'enviado', now(), now()]);
+            ->execute([$video, mb_substr($caption, 0, 2200), $productId ?: null, $mlId, mb_substr($title, 0, 250), $shareToFeed ? 1 : 0, $status, now(), now()]);
         return (int)db()->lastInsertId();
     }
 

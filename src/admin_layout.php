@@ -6,6 +6,7 @@ function admin_header(string $title, string $active = '', bool $showTitle = true
     $site = setting('site_name', 'Achados Meli');
     $nav = [
         'produtos' => ['index.php', 'Produtos'],
+        'insights' => ['insights.php', 'Insights'],
         'buscar' => ['buscar.php', 'Buscar no ML'],
         'coleta' => ['coleta.php', 'Coleta automática'],
         'categorias' => ['categorias.php', 'Categorias'],

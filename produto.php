@@ -13,4 +13,4 @@ $p = $st->fetch();
 header('X-Robots-Tag: noindex, nofollow');
 if (!$p) redirect(url(''));
 http_response_code(301);
-redirect(go_url($p));
+redirect(go_url($p, 'legado'));

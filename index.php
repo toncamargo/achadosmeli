@@ -19,6 +19,9 @@ foreach ($cats as $c) if ($c['slug'] === $catSlug) $currentCat = $c;
 
 $isHome = $q === '' && !$currentCat && $sort === '' && !$frete && !$cupom && !$max && $page === 1;
 
+// Página atual, gravada junto do clique (painel Insights)
+$GLOBALS['click_page'] = $q !== '' ? 'busca' : ($currentCat ? 'categoria' : ($isHome ? 'home' : 'lista'));
+
 $discExpr = 'CASE WHEN p.original_price > p.price THEN (p.original_price - p.price) / p.original_price ELSE 0 END';
 
 /* ---------- listagem (usada na home e nas páginas filtradas) ---------- */
@@ -80,7 +83,7 @@ if ($isHome) {
                 'prefix' => $pct ? 'ATÉ' : '', 'mega' => $pct ? $pct . '%' : money((float)$b['price']), 'suffix' => $pct ? 'OFF' : '',
                 'pill' => ($pct ? 'Por ' . money((float)$b['price']) . ' · ' : '') . 'Ver oferta',
                 'footnote' => '*Preço conferido em ' . date('d/m/Y', strtotime((string)$b['price_updated_at'])) . '. Pode mudar sem aviso.',
-                'image' => $b['image'], 'href' => go_url($b), 'external' => true,
+                'image' => $b['image'], 'href' => go_url($b, 'site', 'home-banner'), 'external' => true,
             ];
         }
     }

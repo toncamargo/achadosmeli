@@ -3,7 +3,7 @@
  *
  * AchadosReels.gravar(dados, opcoes) → Promise<{ blob, ext, info }>
  *   dados: { titulo, nota, avals, reais, cents, video (URL .m3u8 da maior resolução) }
- *   opcoes: { formato: 'reels' | 'feed', escalaTexto: 0.7, margem: 10, margemInferior, cta, aoMudar(status) }
+ *   opcoes: { formato: 'reels' | 'feed', escalaTexto: 0.7, margem: 26, margemInferior (80 no Reels, 16 no feed), cta, aoMudar(status) }
  *
  * - Formato do Instagram: Reels 9:16 (1080x1920) ou feed 4:5 (1080x1350). Vídeo com proporção
  *   diferente entra inteiro, com o próprio vídeo desfocado no fundo.
@@ -34,8 +34,11 @@
     const aoMudar = opt.aoMudar || (() => {});
     const feed = opt.formato === 'feed';
     const W = 1080, H = feed ? 1350 : 1920;
-    const margem = opt.margem == null ? 10 : opt.margem;
-    const margemInf = opt.margemInferior != null ? opt.margemInferior : (feed ? margem : 110);
+    // Margens na escala de uma tela de 360px (×3 no vídeo de 1080px). Em tela cheia o Instagram corta
+    // as laterais em celulares mais compridos que 9:16, por isso 26 nas laterais; embaixo, 80 deixa o
+    // card logo acima da legenda/botões do app sem ser cortado.
+    const margem = opt.margem == null ? 26 : opt.margem;
+    const margemInf = opt.margemInferior != null ? opt.margemInferior : (feed ? 16 : 80);
     const escala = opt.escalaTexto || 0.7;
     const cta = opt.cta || 'Comente QUERO';
     const info = {};
@@ -114,10 +117,22 @@
 
     rec.start(1000);
     aoMudar('gravando (' + info.duracao + ' s)');
+    // Se o Chrome pausar o player no meio (aba sem foco, travada etc.), pausa a gravação junto
+    // e retoma, para o vídeo não sair com trecho congelado.
+    v.onpause = () => {
+      if (!gravando || v.ended) return;
+      try { if (rec.state === 'recording') rec.pause(); } catch (e) { /* ignora */ }
+      v.play().then(() => { try { if (rec.state === 'paused') rec.resume(); } catch (e) { /* ignora */ } }).catch(() => {});
+    };
+    const vigia = setInterval(() => {
+      if (gravando && v.paused && !v.ended) v.play().then(() => { try { if (rec.state === 'paused') rec.resume(); } catch (e) { /* ignora */ } }).catch(() => {});
+    }, 2000);
     await v.play();
     await new Promise((r) => { v.onended = r; });
+    clearInterval(vigia);
     await espera(150);
     gravando = false;
+    v.onpause = null;
     rec.stop();
     await parou;
     v.remove();

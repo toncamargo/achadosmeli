@@ -255,6 +255,27 @@ function db_migrate(): void
         published_at $text NULL
     )$engine");
 
+    // Insights: um registro por clique em ir.php (de onde veio, quando, em que aparelho).
+    // products.clicks continua sendo o total; aqui fica o detalhe para o painel admin/insights.php.
+    $idx = db_is_mysql() ? ', INDEX idx_ce_created (created_at), INDEX idx_ce_product (product_id)' : '';
+    $pdo->exec("CREATE TABLE IF NOT EXISTS click_events (
+        id $pk,
+        product_id INT NOT NULL,
+        category_id INT NULL,
+        origin VARCHAR(20) NOT NULL DEFAULT 'site',
+        placement VARCHAR(40) NULL,
+        media_id VARCHAR(64) NULL,
+        visitor CHAR(16) NULL,
+        device VARCHAR(10) NULL,
+        referrer VARCHAR(120) NULL,
+        is_admin INT NOT NULL DEFAULT 0,
+        created_at VARCHAR(19) NOT NULL$idx
+    )$engine");
+    if (!db_is_mysql()) {
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_ce_created ON click_events (created_at)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_ce_product ON click_events (product_id)');
+    }
+
     // Categorias iniciais (só na primeira vez)
     $count = (int)$pdo->query('SELECT COUNT(*) FROM categories')->fetchColumn();
     if ($count === 0) {

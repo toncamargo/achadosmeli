@@ -52,14 +52,57 @@ function asset(string $path): string
  * O site não tem página de produto: todo link de produto leva ao Mercado Livre
  * passando por ir.php (que conta o clique e redireciona para o link de afiliado).
  */
-function product_url(array $p): string
+function product_url(array $p, string $placement = ''): string
 {
-    return go_url($p);
+    return go_url($p, 'site', $placement);
 }
 
-function go_url(array $p): string
+/**
+ * Link de saída para o ML. $origin/$placement/$mediaId vão na URL para o painel Insights
+ * saber de onde veio o clique (site, instagram, social, legado…).
+ */
+function go_url(array $p, string $origin = 'site', string $placement = '', string $mediaId = ''): string
 {
-    return url('ir.php?id=' . (int)$p['id']);
+    $q = ['id' => (int)$p['id']];
+    if ($origin !== '' && $origin !== 'site') $q['src'] = $origin;
+    if ($placement !== '') $q['pos'] = $placement;
+    if ($mediaId !== '') $q['m'] = $mediaId;
+    return url('ir.php?' . http_build_query($q));
+}
+
+/** Grava um clique em click_events. Nunca interrompe o redirecionamento. */
+function click_log(array $p, bool $admin): void
+{
+    try {
+        $clean = fn($v, int $max) => mb_substr(preg_replace('/[^a-z0-9_\-.]/i', '', (string)$v), 0, $max);
+        $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $origin = $clean($_GET['src'] ?? '', 20);
+        // Link aberto dentro do app do Instagram sem marcação (ex.: link da bio)
+        if ($origin === '' && stripos($ua, 'instagram') !== false) $origin = 'instagram';
+        if ($origin === '') $origin = 'site';
+        // Só origens conhecidas (o parâmetro vem da URL); o resto vira "outro"
+        $known = ['site', 'instagram', 'social', 'legado', 'whatsapp', 'telegram', 'tiktok', 'bio', 'email'];
+        if (!in_array($origin, $known, true)) $origin = 'outro';
+
+        $salt = setting('click_salt');
+        if (!$salt) { $salt = bin2hex(random_bytes(16)); setting_set('click_salt', $salt); }
+        $ip = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
+        $ip = trim(explode(',', $ip)[0]);
+        // Visitante anônimo: hash diário (não guarda IP — LGPD)
+        $visitor = substr(hash('sha256', $ip . '|' . $ua . '|' . date('Y-m-d') . '|' . $salt), 0, 16);
+
+        $device = preg_match('/ipad|tablet/i', $ua) ? 'tablet' : (preg_match('/mobi|android|iphone/i', $ua) ? 'mobile' : 'desktop');
+        $ref = (string)parse_url((string)($_SERVER['HTTP_REFERER'] ?? ''), PHP_URL_HOST);
+
+        db()->prepare('INSERT INTO click_events (product_id, category_id, origin, placement, media_id, visitor, device, referrer, is_admin, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)')->execute([
+            (int)$p['id'], $p['category_id'] !== null ? (int)$p['category_id'] : null, $origin,
+            $clean($_GET['pos'] ?? '', 40) ?: null, $clean($_GET['m'] ?? '', 64) ?: null,
+            $visitor, $device, mb_substr($ref, 0, 120) ?: null, $admin ? 1 : 0, now(),
+        ]);
+    } catch (Throwable $ex) {
+        error_log('[achadosmeli] click_log: ' . $ex->getMessage());
+    }
 }
 
 function money(?float $v): string
@@ -361,7 +404,7 @@ function social_text(array $p): string
     if (!empty($p['coupon'])) $lines[] = '🎟️ Cupom: ' . $p['coupon'];
     if (!empty($p['free_shipping'])) $lines[] = '🚚 Frete grátis';
     $lines[] = '';
-    $lines[] = '👉 ' . product_url($p);
+    $lines[] = '👉 ' . go_url($p, 'social');
     $lines[] = '';
     $lines[] = '_Preço sujeito a alteração._';
     return implode("\n", $lines);
